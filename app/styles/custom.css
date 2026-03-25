@@ -1,0 +1,94 @@
+/* ==========================================================
+   1. PANEL PRINCIPAL Y TARJETAS (LIMPIAS Y DINÁMICAS)
+   ========================================================== */
+.consolidado-panel {
+    background-color: transparent;
+    margin-top: -50px; 
+    padding-top: 20px;
+    margin-bottom: 30px;
+}
+
+.metric-card-custom {
+    background: linear-gradient(135deg, #1E2630 0%, #293542 100%);
+    padding: 25px;
+    border-radius: 15px;
+    border: 1px solid #3E4A5B;
+    box-shadow: 2px 2px 10px rgba(0,0,0,0.2);
+    transition: all 0.3s ease; 
+    text-align: center;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+/* Efecto hover sutil sin opacidad */
+.metric-card-custom:hover {
+    transform: translateY(-5px) scale(1.02); 
+    border-color: #ff9f43; 
+}
+
+/* --- ESTILOS DE TEXTO --- */
+.metric-label-custom {
+    color: #AEB6BF;
+    font-size: 16px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px; 
+    margin-bottom: 15px;
+    font-weight: 600;
+}
+
+.metric-value-custom {
+    color: #FFFFFF; 
+    font-size: 54px; 
+    font-weight: 800;
+    margin-bottom: 10px;
+}
+
+/* ==========================================================
+   2. BARRAS DE PROGRESO (TU ANIMACIÓN DE FLUJO)
+   ========================================================== */
+@keyframes flujoCarga {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+div[data-testid="stProgress"] > div > div > div > div {
+    background: linear-gradient(
+        90deg, 
+        #E67E22 0%, 
+        #ff9f43 35%, 
+        rgba(255, 255, 255, 0.7) 50%, 
+        #ff9f43 65%, 
+        #E67E22 100%
+    ) !important;
+    background-size: 200% 100% !important;
+    animation: flujoCarga 2s infinite linear !important;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(230, 126, 34, 0.5);
+}
+
+/* ==========================================================
+   3. ESTILO PARA ANÁLISIS DE IA Y GRÁFICOS
+   ========================================================== */
+.resultado-ia-columna {
+    background-color: rgba(30, 38, 48, 0.7);
+    padding: 15px;
+    border-radius: 8px;
+    border-top: 3px solid #E67E22;
+    margin-top: 15px;
+    color: #F0F2F6;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+/* Forzar opacidad completa en contenedores de gráficos */
+[data-testid="stPlotlyChart"] {
+    opacity: 1 !important;
+}
+
+/* --- TÍTULOS GENERALES --- */
+h1, h2, h3 {
+    color: #F0F2F6 !important;
+    font-weight: 700 !important;
+}
