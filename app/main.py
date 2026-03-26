@@ -20,6 +20,17 @@ except ModuleNotFoundError as e:
     st.error(f"❌ Error al cargar módulos internos: {e}")
     st.stop()
 
+@st.dialog("📊 Diagnóstico de Riesgo Psicosocial")
+def mostrar_analisis_modal(titulo, contenido):
+    st.write(f"### Análisis: {titulo}")
+    
+    # Contenedor con scroll por si la IA se extiende
+    with st.container(height=400, border=False):
+        st.markdown(contenido)
+    
+    if st.button("✅ Entendido", use_container_width=True):
+        st.rerun()
+
 # --- 3. CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Batería Psicosocial AI", layout="wide")
 
@@ -27,7 +38,35 @@ st.set_page_config(page_title="Batería Psicosocial AI", layout="wide")
 def local_css(file_name):
     if os.path.exists(file_name):
         with open(file_name, encoding="utf-8") as f:
-            st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+            st.markdown("""
+            <style>
+            /* ⚠️ CSS CRÍTICO PARA DESENFOQUE TOTAL DE FONDO:
+            Este selector avanzado detecta la presencia del modal 
+            y aplica el efecto de desenfoque a TODA la vista de la aplicación de fondo.
+            Se debe asegurar que el navegador soporta :has() (Chrome 105+, Safari 15.4+, Edge 105+).
+            */
+            :root:has(div[data-testid="stDialog"]) .stAppViewContainer {
+                filter: blur(12px) !important; /* Aumentado a 12px para mayor contraste */
+                transition: filter 0.3s ease-in-out; /* Animación suave al abrir/cerrar */
+            }
+
+            /* Aseguramos que el área oscura detrás del modal sea uniforme y 
+            tape las distracciones si el navegador no soporta desenfoque total.
+            */
+            div[data-testid="stDialog"] {
+                background-color: rgba(0, 0, 0, 0.75) !important; /* Oscurece la pantalla completa */
+            }
+
+            /* Ajustes estéticos al cuadro del diálogo para maximizar legibilidad 
+            */
+            div[data-testid="stDialog"] div[role="dialog"] {
+                border-radius: 12px !important;
+                background-color: #1a1c24 !important; /* Un tono más oscuro y sólido */
+                border: 1px solid rgba(255, 255, 255, 0.1) !important;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
+            }
+            </style>
+            """, unsafe_allow_html=True)
 
 path_css = os.path.join(root_path, "styles", "custom.css")
 local_css(path_css)
@@ -183,12 +222,28 @@ if archivo is not None:
                                 if st.button("🔍 Ver detalles", key="btn_intra_stats", use_container_width=True):
                                     st.session_state['ver_subdimensiones_intra'] = True
                                     st.rerun()
+                        # --- DENTRO DEL FOR NOMBRE, DF_G, COLUMNA EN DIMS_GLOBALES ---
                         with c2:
-                            if st.button(f"🪄 Plan de Acción {nombre}", key=f"ai_plan_{nombre}", use_container_width=True):
-                                with st.spinner("Generando recomendaciones con IA..."):
+                            if st.button(f"📊 Analizar {nombre}", key=f"ai_analisis_{nombre}", use_container_width=True):
+                                with st.spinner(f"Analizando datos de {nombre}..."):
                                     data_context = df_g_pct[['Nivel', 'Porcentaje']].to_string(index=False)
-                                    respuesta = consultar_gemini(f"Genera un plan de acción breve (3 puntos) para mejorar los resultados de {nombre} basados en estos datos: {data_context}")
-                                    st.info(respuesta)
+                                    
+                                    prompt_analisis = (
+                                        f"Analiza técnicamente los resultados de la dimensión '{nombre}'. "
+                                        f"Datos: {data_context}. Identifica el riesgo predominante y su impacto."
+                                    )
+                                    
+                                    config_analisis = config_ia.copy()
+                                    config_analisis["formato"] = "Párrafos con negritas y subtítulos" # Mejoramos el formato
+                                    
+                                    respuesta = consultar_gemini(prompt_analisis, config_personalizada=config_analisis)
+                                    
+                                    # LLAMADA AL MODAL: En lugar de st.info(respuesta)
+                                    mostrar_analisis_modal(nombre, respuesta)
+                                    
+                                    # Usamos st.success o st.info para mostrar el diagnóstico
+                                    st.markdown(f"**🔍 Diagnóstico Estadístico - {nombre}:**")
+                                    st.write(respuesta)
 
                 st.markdown("---")
                 st.subheader("🍩 Distribución y Volumen de Riesgos")
@@ -228,6 +283,56 @@ if archivo is not None:
             else:
                 # --- VISTA SUBDIMENSIONES ---
                 st.markdown("### 🧱 Desglose: Subdimensiones Intralaborales (A+B)")
+                
+                # --- NUEVA SECCIÓN: TOP 3 CRÍTICOS ---
+                try:
+                    df_informe = pd.read_excel(archivo, sheet_name="Informe General", header=None, engine=motor)
+                    
+                    # 1. Definimos las coordenadas de todas las subdimensiones para analizarlas
+                    analisis_sub = {
+                        "Demandas emocionales": {"cols": range(2, 8), "row_header": 2, "row_data": 4},
+                        "Demandas de jornada": {"cols": range(11, 16), "row_header": 2, "row_data": 4},
+                        "Control sobre el trabajo": {"cols": range(20, 25), "row_header": 2, "row_data": 4}, # Ajusta según tu Excel
+                        "Liderazgo": {"cols": range(29, 34), "row_header": 2, "row_data": 4} # Ajusta según tu Excel
+                    }
+
+                    ranking_critico = []
+
+                    for nombre_sub, coords in analisis_sub.items():
+                        try:
+                            vals = pd.to_numeric(df_informe.iloc[coords['row_data'], coords['cols']], errors='coerce').fillna(0).tolist()
+                            heads = df_informe.iloc[coords['row_header'], coords['cols']].tolist()
+                            
+                            # Calculamos el % crítico (Alto + Muy Alto)
+                            crit_sum = 0
+                            for h, v in zip(heads, vals):
+                                if h in ["Riesgo alto", "Riesgo muy alto"]:
+                                    crit_sum += (v * 100 if v <= 1.0 else v)
+                            
+                            ranking_critico.append({"Subdimensión": nombre_sub, "Crítico": crit_sum})
+                        except: continue
+
+                    # 2. Ordenamos y tomamos las 3 peores
+                    top_3 = sorted(ranking_critico, key=lambda x: x['Crítico'], reverse=True)[:3]
+
+                    # 3. Renderizamos las Mini-Tarjetas de Alerta
+                    st.write("⚠️ **Dimensiones con mayor impacto negativo:**")
+                    cols_top = st.columns(3)
+                    for i, item in enumerate(top_3):
+                        with cols_top[i]:
+                            st.markdown(f"""
+                                <div style="background: rgba(192, 57, 43, 0.1); border-left: 5px solid #C0392B; 
+                                            padding: 15px; border-radius: 5px;">
+                                    <p style="margin:0; font-size: 12px; color: #aaa;"># {i+1} Crítica</p>
+                                    <h4 style="margin:5px 0; font-size: 14px; color: white;">{item['Subdimensión']}</h4>
+                                    <h3 style="margin:0; color: #E74C3C;">{item['Crítico']:.1f}%</h3>
+                                </div>
+                            """, unsafe_allow_html=True)
+                except:
+                    st.warning("No se pudo generar el ranking automático.")
+
+                st.markdown("---")
+                
                 if st.button("⬅️ Volver al Resumen Global"):
                     st.session_state['ver_subdimensiones_intra'] = False
                     st.rerun()
@@ -266,7 +371,7 @@ if archivo is not None:
                                     if st.button(f"🪄 Plan IA: {sub}", key=f"ai_plan_sub_{sub}"):
                                         with st.spinner(f"Analizando {sub}..."):
                                             data_sub_ctx = df_sub[['Nivel', 'Valor']].to_string(index=False)
-                                            st.info(consultar_gemini(f"Como experto en salud mental laboral, sugiere 2 estrategias para la subdimensión '{sub}' con estos datos: {data_sub_ctx}"))
+                                            st.info(consultar_gemini(prompt_usuario=f"Como experto en salud mental laboral, sugiere 2 estrategias para la subdimensión '{sub}' con estos datos: {data_sub_ctx}",config_personalizada=None, tokens=700))
 
                                 with c_chart:
                                     fig_sub = px.bar(
