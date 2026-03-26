@@ -1,4 +1,6 @@
 streamlit
 pandas
+google-generativeai
 plotly
 openpyxl
+pyxlsb

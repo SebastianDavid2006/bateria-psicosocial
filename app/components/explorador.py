@@ -60,3 +60,4 @@ def render_explorador_dinamico(df_raw, categoria, COLORES_RIESGO, consultar_gemi
             val_muy_alto = df_dim[df_dim["Nivel"] == "Riesgo muy alto"]["Porcentaje"].sum()
             p_ia = f"Genera 3 acciones de intervención para la dimensión '{dim_especifica}' con un {val_muy_alto:.1f}% de riesgo muy alto."
             st.markdown(consultar_gemini(p_ia))
+            

@@ -1,20 +1,20 @@
-# 🛡️ Batería Psicosocial AI
+# 🛡️ Sistema de Análisis Psicosocial con IA
 
-Sistema automatizado para el análisis de riesgo psicosocial en entornos corporativos. Esta herramienta permite procesar reportes de Excel, consolidar datos de diferentes poblaciones (Jefes y Operativos) y visualizar indicadores críticos de salud mental.
+Software especializado en el procesamiento y visualización de **Baterías de Riesgo Psicosocial**. Utiliza Python y Streamlit para transformar reportes complejos en dashboards interactivos y resúmenes ejecutivos.
 
-## 🚀 Funcionalidades
-* **Extracción Inteligente**: Lectura automatizada de datos desde formatos específicos de Excel.
-* **Consolidación Automática**: Suma y cálculo de porcentajes reales para poblaciones combinadas (Forma A + Forma B).
-* **Visualización de Riesgo Crítico**: Identificación inmediata del porcentaje de impacto en Riesgo Alto y Muy Alto.
-* **Dashboard Interactivo**: Gráficos dinámicos desarrollados en Streamlit y Plotly.
+## ✨ Características Principales
+* **Análisis Multinivel:** Diferenciación automática entre Formas A (Jefes) y B (Operativos).
+* **Consolidado Global:** Visualización unificada de métricas críticas (Intralaboral, Extralaboral y Estrés).
+* **IA Integration:** Capacidad de consulta dinámica mediante la API de Gemini para interpretación de datos.
+* **UX/UI Moderna:** Interfaz con temas oscuros, tarjetas con degradado y gráficos de alta legibilidad en porcentajes.
 
-## 🛠️ Tecnologías
-* **Lenguaje**: Python 3.x
-* **Framework**: Streamlit
-* **Análisis de Datos**: Pandas
-* **Gráficos**: Plotly Express
+## 🚀 Tecnologías
+* **Python 3.10+**
+* **Streamlit** (Frontend)
+* **Plotly** (Gráficos dinámicos)
+* **Pandas** (Procesamiento de datos)
 
-## 📦 Instalación
-1. Clona el repositorio:
-   ```bash
-   git clone [https://github.com/TU_USUARIO/bateria-psicosocial.git](https://github.com/TU_USUARIO/bateria-psicosocial.git)
+## 🛠️ Instalación
+1. Clona el repositorio.
+2. Instala dependencias: `pip install -r requirements.txt`.
+3. Ejecuta la app: `streamlit run main.py`.

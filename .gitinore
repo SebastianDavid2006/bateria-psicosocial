@@ -1,12 +1,16 @@
-# Python
+# Entornos virtuales
+venv/
+.env
+
+# Archivos de Python
 __pycache__/
 *.py[cod]
-*$py.class
-venv/
-env/
 
-# Streamlit & Excel
-.streamlit/
+# Archivos de Streamlit y SO
+.streamlit/config.toml
+.DS_Store
 *.xlsx
-*.xls
-.env
+*.xlsb
+
+# IMPORTANTE: No subir los datos de prueba
+assets/*.png
