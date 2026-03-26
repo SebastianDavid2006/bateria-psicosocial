@@ -101,6 +101,50 @@ if archivo is not None:
             with col_t3: st.markdown(tarjeta_style.format(titulo="ESTRÉS", porcentaje=obtener_riesgo_critico(global_estres), color="#2E86C1"), unsafe_allow_html=True)
 
             st.markdown("---")
+            
+            # --- NUEVA SECCIÓN: ESTADÍSTICAS GENERALES (A+B) EN % ---
+            st.subheader("📊 Distribución Porcentual por Dimensión (A+B)")
+            col_g1, col_g2, col_g3 = st.columns(3)
+            
+            dims_globales = [
+                ("Intralaboral", global_intra, col_g1),
+                ("Extralaboral", global_extra, col_g2),
+                ("Estrés", global_estres, col_g3)
+            ]
+            
+            for nombre, df_g, columna in dims_globales:
+                with columna:
+                    # Calculamos el porcentaje para esta dimensión específica
+                    total_dim = df_g['Valor'].sum()
+                    df_g_pct = df_g.copy()
+                    df_g_pct['Porcentaje'] = (df_g_pct['Valor'] / total_dim * 100)
+                    
+                    fig_bar = px.bar(
+                        df_g_pct, 
+                        x='Porcentaje', 
+                        y='Nivel', 
+                        orientation='h',
+                        color='Nivel', 
+                        color_discrete_map=COLORES_RIESGO,
+                        text=df_g_pct['Porcentaje'].apply(lambda x: f'{x:.1f}%'),
+                        title=f"Distribución {nombre}"
+                    )
+                    
+                    fig_bar.update_layout(
+                        showlegend=False, 
+                        height=280, 
+                        margin=dict(l=0, r=40, t=40, b=0),
+                        xaxis_title="", 
+                        yaxis_title="", 
+                        xaxis_visible=False,
+                        # Asegura que el texto del % siempre quepa
+                        uniformtext_minsize=10, 
+                        uniformtext_mode='hide'
+                    )
+                    fig_bar.update_traces(textposition='outside', cliponaxis=False)
+                    st.plotly_chart(fig_bar, use_container_width=True, key=f"global_pct_{nombre}")
+
+            st.markdown("---")
             st.subheader("🍩 Distribución y Volumen de Riesgos")
 
             # Datos para Dona
@@ -142,7 +186,6 @@ if archivo is not None:
                         </div>
                     """, unsafe_allow_html=True)
                 
-                # UNICA TARJETA DE TOTAL (ELIMINADOS LOS OTROS 2 BLOQUES)
                 st.markdown(f"""
                     <div style="margin-top: 25px; padding: 20px; 
                                 background: linear-gradient(135deg, #2c3e50 0%, #000000 100%); 
