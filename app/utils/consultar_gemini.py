@@ -7,7 +7,7 @@ def consultar_gemini(prompt_usuario, config_personalizada=None, tokens=500):
     """
     try:
         # 1. Configuración de API
-        api_key = "AIzaSyCrgZ00tWBTX7WpsX7oNmvC-hEoRM5APes"
+        api_key = "AIzaSyATlO_wLu_5Y2qpF04Hkz1HYRiescF9XEQ"
         url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=" + api_key
 
         # 2. Extraer parámetros del usuario o usar valores por defecto

@@ -1,41 +1,35 @@
 # utils/catalogo_acciones.py
 
-def obtener_nivel_riesgo_colombia(porcentaje):
+def obtener_diagnostico_completo(dimension, porcentaje):
     """
-    Clasifica el riesgo basado EXACTAMENTE en la tabla 
-    de baremos de la imagen del usuario.
-    Retorna: (Nivel de Riesgo, Color Hexadecimal)
+    Clasifica el riesgo y asigna la acción oficial.
+    Basado en la Tabla de Baremos del usuario.
     """
+    # 1. Lógica de Baremos (Basado en tu imagen de porcentajes)
     if porcentaje < 30:
-        return "SIN RIESGO", "#006400" # Verde oscuro
+        nivel, color = "SIN RIESGO", "#006400" # Verde oscuro
     elif porcentaje < 50:
-        return "BAJO", "#00FF00"      # Verde claro
+        nivel, color = "BAJO", "#228B22"      # Verde bosque
     elif porcentaje < 70:
-        return "MEDIO", "#FFFF00"     # Amarillo
+        nivel, color = "MEDIO", "#FFD700"     # Dorado/Amarillo
     elif porcentaje < 85:
-        return "ALTO", "#FF0000"      # Rojo (Para el borde)
+        nivel, color = "ALTO", "#FF4500"      # Naranja/Rojo
     else:
-        return "MUY ALTO", "#8B0000"  # Rojo oscuro
+        nivel, color = "MUY ALTO", "#8B0000"  # Rojo oscuro
 
-# Catálogo de acciones basado en tu imagen image_5bc161.png
-CATALOGO_OFICIAL_ACCIONES = {
-    "Demandas emocionales": {
-        "MUY ALTO": "Seguimiento a inspecciones de EPP, Gestión emocional - Psicokeratty grupal.",
-        "ALTO": "Intervención focalizada en gestión de emociones y talleres de contención emocional (SST).",
-        "MEDIO": "Capacitación en manejo de usuarios difíciles y asertividad.",
-        "BAJO": "Cápsulas informativas sobre bienestar emocional.",
-        "SIN RIESGO": "Monitoreo preventivo semestral."
-    },
-    # ... agregar otras dimensiones después
-}
+    # 2. Catálogo de Acciones (Oficial)
+    # Aquí iremos mapeando las 40 dimensiones
+    catalogo_acciones = {
+        "Demandas emocionales": {
+            "MUY ALTO": "Seguimiento a inspecciones de EPP, Gestión emocional - Psicokeratty grupal e intervención clínica individual.",
+            "ALTO": "Intervención focalizada en gestión de emociones y talleres de contención emocional (SST).",
+            "MEDIO": "Capacitación en manejo de usuarios difíciles, asertividad y comunicación no violenta.",
+            "BAJO": "Cápsulas informativas sobre bienestar emocional.",
+            "SIN RIESGO": "Mantener actividades de promoción de la salud mental y monitoreo preventivo."
+        }
+    }
 
-def obtener_accion_y_contexto(dimension, puntaje):
-    """
-    Combina la lógica de baremos con el catálogo de acciones.
-    """
-    nivel, color = obtener_nivel_riesgo_colombia(puntaje)
-    
-    # Busca la acción oficial, si no existe devuelve un mensaje genérico
-    accion_oficial = CATALOGO_OFICIAL_ACCIONES.get(dimension, {}).get(nivel, "Seguir lineamientos generales del SG-SST.")
-    
-    return nivel, accion_oficial, color
+    # Buscamos la acción oficial en el diccionario
+    accion = catalogo_acciones.get(dimension, {}).get(nivel, "Consultar manual general de SST para acciones específicas.")
+
+    return nivel, color, accion

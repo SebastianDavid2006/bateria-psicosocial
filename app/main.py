@@ -12,10 +12,17 @@ if root_path not in sys.path:
 
 # --- 2. IMPORTS DE TUS MÓDULOS ---
 try:
-    from utils.extractor import extraer_datos_psicosocial, extraer_subdimension
+    # AÑADE 'extraer_tabla_por_titulo' A ESTA LISTA 👇
+    from utils.extractor import (
+        extraer_datos_psicosocial, 
+        procesar_dimensiones_por_grupo, 
+        CONFIG_BATERIA,
+        extraer_tabla_por_titulo  # <--- ESTA ES LA QUE FALTA
+    )
     from utils.consultar_gemini import consultar_gemini
     from components.tabs_view import render_tabs
     from components.explorador import render_explorador_dinamico
+    from utils.catalogo_acciones import obtener_diagnostico_completo
 except ModuleNotFoundError as e:
     st.error(f"❌ Error al cargar módulos internos: {e}")
     st.stop()
@@ -281,122 +288,82 @@ if archivo is not None:
                         </div>""", unsafe_allow_html=True)
             
             else:
-                # --- VISTA SUBDIMENSIONES ---
-                st.markdown("### 🧱 Desglose: Subdimensiones Intralaborales (A+B)")
+                # 1. Definición de Dominios y sus Dimensiones (Títulos exactos del Excel)
+                DOMINIOS_MAP = {
+                    "Liderazgo y Relaciones": [
+                        "Caracteristicas Liderazgo", 
+                        "Relaciones Sociales", 
+                        "Retroal. Desempeño", 
+                        "Relación colaboradores"
+                    ],
+                    "Recompensas": [
+                        "Reconocimiento y compensación",
+                        "Recompensas derivadas de la pertenencia a la organización y del trabajo que se realiza"
+                    ]
+                }
+
+                st.markdown("### 🧱 Gestión por Dominios")
                 
-                # --- NUEVA SECCIÓN: TOP 3 CRÍTICOS ---
+                col_back, col_area, col_dominio = st.columns([0.8, 1.6, 1.6])
+                
+                with col_back:
+                    if st.button("⬅️ Volver", use_container_width=True):
+                        st.session_state['ver_subdimensiones_intra'] = False
+                        st.rerun()
+
                 try:
-                    df_informe = pd.read_excel(archivo, sheet_name="Informe General", header=None, engine=motor)
+                    # Carga de la hoja Informe General
+                    extension_inf = archivo.name.split('.')[-1].lower()
+                    motor_inf = "pyxlsb" if extension_inf == "xlsb" else None
+                    df_informe = pd.read_excel(archivo, sheet_name="Informe General", header=None, engine=motor_inf)
                     
-                    # 1. Definimos las coordenadas de todas las subdimensiones para analizarlas
-                    analisis_sub = {
-                        "Demandas emocionales": {"cols": range(2, 8), "row_header": 2, "row_data": 4},
-                        "Demandas de jornada": {"cols": range(11, 16), "row_header": 2, "row_data": 4},
-                        "Control sobre el trabajo": {"cols": range(20, 25), "row_header": 2, "row_data": 4}, # Ajusta según tu Excel
-                        "Liderazgo": {"cols": range(29, 34), "row_header": 2, "row_data": 4} # Ajusta según tu Excel
-                    }
+                    # --- DETECCIÓN DE ÁREAS ---
+                    columna_areas = 13 
+                    lista_areas_raw = df_informe.iloc[:, columna_areas].dropna().unique().tolist()
+                    omitir = ["ETIQUETAS DE FILA", "(EN BLANCO)", "TOTAL GENERAL", "ÁREA", "VALORES"]
+                    lista_areas = [str(a).strip() for a in lista_areas_raw if str(a).strip().upper() not in omitir and len(str(a)) > 2]
+                    
+                    with col_area:
+                        area_sel = st.selectbox("📍 Seleccione Área:", sorted(lista_areas))
+                    
+                    with col_dominio:
+                        dominio_sel = st.selectbox("📂 Dominio a Validar:", list(DOMINIOS_MAP.keys()))
 
-                    ranking_critico = []
+                    st.markdown("---")
+                    st.subheader(f"📊 Detalle: {dominio_sel}")
 
-                    for nombre_sub, coords in analisis_sub.items():
-                        try:
-                            vals = pd.to_numeric(df_informe.iloc[coords['row_data'], coords['cols']], errors='coerce').fillna(0).tolist()
-                            heads = df_informe.iloc[coords['row_header'], coords['cols']].tolist()
+                    # --- BUCLE DINÁMICO DE DIMENSIONES ---
+                    # Esto reemplaza los bloques 'especialistas' manuales
+                    dimensiones_a_procesar = DOMINIOS_MAP[dominio_sel]
+                    
+                    # Creamos una rejilla de 2 columnas para las gráficas
+                    grid_cols = st.columns(2)
+                    
+                    for idx, nombre_dimension in enumerate(dimensiones_a_procesar):
+                        # Alternamos entre columna 1 y 2
+                        with grid_cols[idx % 2]:
+                            # Usamos tu función genérica para buscar la tabla
+                            df_dim = extraer_tabla_por_titulo(df_informe, nombre_dimension, area_sel) # <-- Agregamos area_sel
                             
-                            # Calculamos el % crítico (Alto + Muy Alto)
-                            crit_sum = 0
-                            for h, v in zip(heads, vals):
-                                if h in ["Riesgo alto", "Riesgo muy alto"]:
-                                    crit_sum += (v * 100 if v <= 1.0 else v)
-                            
-                            ranking_critico.append({"Subdimensión": nombre_sub, "Crítico": crit_sum})
-                        except: continue
-
-                    # 2. Ordenamos y tomamos las 3 peores
-                    top_3 = sorted(ranking_critico, key=lambda x: x['Crítico'], reverse=True)[:3]
-
-                    # 3. Renderizamos las Mini-Tarjetas de Alerta
-                    st.write("⚠️ **Dimensiones con mayor impacto negativo:**")
-                    cols_top = st.columns(3)
-                    for i, item in enumerate(top_3):
-                        with cols_top[i]:
-                            st.markdown(f"""
-                                <div style="background: rgba(192, 57, 43, 0.1); border-left: 5px solid #C0392B; 
-                                            padding: 15px; border-radius: 5px;">
-                                    <p style="margin:0; font-size: 12px; color: #aaa;"># {i+1} Crítica</p>
-                                    <h4 style="margin:5px 0; font-size: 14px; color: white;">{item['Subdimensión']}</h4>
-                                    <h3 style="margin:0; color: #E74C3C;">{item['Crítico']:.1f}%</h3>
-                                </div>
-                            """, unsafe_allow_html=True)
-                except:
-                    st.warning("No se pudo generar el ranking automático.")
-
-                st.markdown("---")
-                
-                if st.button("⬅️ Volver al Resumen Global"):
-                    st.session_state['ver_subdimensiones_intra'] = False
-                    st.rerun()
-                
-                try:
-                    df_informe = pd.read_excel(archivo, sheet_name="Informe General", header=None)
-                    
-                    mapeo_manual = {
-                        "Demandas emocionales": {"cols": range(2, 8), "row_header": 2, "row_data": 4},
-                        "Demandas de jornada laboral": {"cols": range(11, 16), "row_header": 2, "row_data": 4}
-                    }
-                    
-                    for sub, coords in mapeo_manual.items():
-                        with st.expander(f"📌 {sub.upper()}", expanded=True):
-                            try:
-                                cabeceras = df_informe.iloc[coords['row_header'], coords['cols']].tolist()
-                                valores = df_informe.iloc[coords['row_data'], coords['cols']].tolist()
-                                
-                                df_sub = pd.DataFrame({"Nivel": cabeceras, "Valor": valores})
-                                df_sub = df_sub[df_sub["Nivel"] != "Total general"]
-                                
-                                df_sub['Valor'] = pd.to_numeric(df_sub['Valor'], errors='coerce').fillna(0)
-                                if df_sub['Valor'].max() <= 1.0 and df_sub['Valor'].max() > 0:
-                                    df_sub['Valor'] = df_sub['Valor'] * 100
-
-                                c_info, c_chart = st.columns([1, 2])
-                                
-                                df_sub['Nivel'] = pd.Categorical(df_sub['Nivel'], categories=ORDEN_RIESGO, ordered=True)
-                                df_sub = df_sub.sort_values('Nivel').dropna(subset=['Nivel'])
-                                crit_val = df_sub[df_sub["Nivel"].isin(["Riesgo alto", "Riesgo muy alto"])]["Valor"].sum()
-                                
-                                with c_info:
-                                    st.error(f"**Riesgo Crítico:** {crit_val:.1f}%")
-                                    st.dataframe(df_sub, hide_index=True)
-                                    # Botón IA para subdimensión
-                                    if st.button(f"🪄 Plan IA: {sub}", key=f"ai_plan_sub_{sub}"):
-                                        with st.spinner(f"Analizando {sub}..."):
-                                            data_sub_ctx = df_sub[['Nivel', 'Valor']].to_string(index=False)
-                                            st.info(consultar_gemini(prompt_usuario=f"Como experto en salud mental laboral, sugiere 2 estrategias para la subdimensión '{sub}' con estos datos: {data_sub_ctx}",config_personalizada=None, tokens=700))
-
-                                with c_chart:
-                                    fig_sub = px.bar(
-                                        df_sub, 
-                                        x='Valor', 
-                                        y='Nivel', 
-                                        orientation='h', 
-                                        color='Nivel', 
-                                        color_discrete_map=COLORES_RIESGO,
-                                        text=df_sub['Valor'].apply(lambda x: f'{x:.1f}%' if x > 0 else '')
-                                    )
-                                    fig_sub.update_layout(
-                                        xaxis_title="Porcentaje (%)",
-                                        yaxis_title="",
-                                        xaxis=dict(range=[0, 105]),
-                                        showlegend=False,
-                                        height=300
-                                    )
-                                    fig_sub.update_traces(textposition='outside')
-                                    st.plotly_chart(fig_sub, use_container_width=True, key=f"chart_{sub}")
-                            except Exception as inner_e:
-                                st.warning(f"No se pudo extraer {sub}.")
+                            if not df_dim.empty and "Valor" in df_dim.columns:
+                                if df_dim["Valor"].sum() > 0:
+                                    with st.expander(f"📌 {nombre_dimension.upper()}", expanded=True):
+                                        fig = px.bar(df_dim, x='Valor', y='Nivel', orientation='h',
+                                                     color='Nivel', color_discrete_map=COLORES_RIESGO,
+                                                     text=df_dim['Valor'].apply(lambda x: f'{x:.1f}%'))
+                                        
+                                        fig.update_layout(height=250, showlegend=False, margin=dict(t=0,b=0))
+                                        st.plotly_chart(fig, use_container_width=True, key=f"chart_{idx}")
+                                else:
+                                    st.warning(f"La dimensión '{nombre_dimension}' tiene valores en cero.")
+                            else:
+                                # Si sale este error, es porque el nombre en el Excel es diferente
+                                st.error(f"❌ No se encontró la tabla: '{nombre_dimension}'")
 
                 except Exception as e:
-                    st.error(f"Error al procesar la hoja 'Informe General'.")
+                    st.error(f"⚠️ Error en la vista de dominios: {e}")
+                    # Opcional: imprimir el error en consola para debug
+                    print(f"Error detallado: {e}")
 
     except Exception as e:
         st.error(f"Error en procesamiento.")
