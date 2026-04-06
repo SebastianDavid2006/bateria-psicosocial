@@ -4,15 +4,18 @@ import re
 
 CONFIG_BATERIA = {
     "INTRALABORAL": [
+        #Liderazgo y Relaciones
         "Caracteristicas Liderazgo", 
         "Relaciones Sociales", 
         "Retroal. Desempeño", 
         "Relación colaboradores",
+        #Control sobre el Trabajo
         "e Control y autonomia sobre el trabajo", 
         "Oportunidades para el desarrollo", 
         "Participación y manejo del cambIo", 
         "Claridad de rol", 
         "Capacitación",
+        #Demandas del Trabajo
         "Demandas del Trabajo",
         "Demandas cuantitativas", 
         "Demandas de carga mental", 
@@ -22,6 +25,7 @@ CONFIG_BATERIA = {
         "Demandas de jornada laboral", 
         "Consistencia de rol", 
         "Influencia sobre el entorno extra",
+        #Recompensas
         "Reconocimiento y compensación", 
         "Recompensas de pertenencia y trabajo"
     ]

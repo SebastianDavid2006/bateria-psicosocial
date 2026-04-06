@@ -45,36 +45,10 @@ st.set_page_config(page_title="Batería Psicosocial AI", layout="wide")
 def local_css(file_name):
     if os.path.exists(file_name):
         with open(file_name, encoding="utf-8") as f:
-            st.markdown("""
-            <style>
-            /* ⚠️ CSS CRÍTICO PARA DESENFOQUE TOTAL DE FONDO:
-            Este selector avanzado detecta la presencia del modal 
-            y aplica el efecto de desenfoque a TODA la vista de la aplicación de fondo.
-            Se debe asegurar que el navegador soporta :has() (Chrome 105+, Safari 15.4+, Edge 105+).
-            */
-            :root:has(div[data-testid="stDialog"]) .stAppViewContainer {
-                filter: blur(12px) !important; /* Aumentado a 12px para mayor contraste */
-                transition: filter 0.3s ease-in-out; /* Animación suave al abrir/cerrar */
-            }
+            # ¡AQUÍ ESTABA EL ERROR! Faltaba el f.read() dentro de las etiquetas style
+            st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
-            /* Aseguramos que el área oscura detrás del modal sea uniforme y 
-            tape las distracciones si el navegador no soporta desenfoque total.
-            */
-            div[data-testid="stDialog"] {
-                background-color: rgba(0, 0, 0, 0.75) !important; /* Oscurece la pantalla completa */
-            }
-
-            /* Ajustes estéticos al cuadro del diálogo para maximizar legibilidad 
-            */
-            div[data-testid="stDialog"] div[role="dialog"] {
-                border-radius: 12px !important;
-                background-color: #1a1c24 !important; /* Un tono más oscuro y sólido */
-                border: 1px solid rgba(255, 255, 255, 0.1) !important;
-                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
-            }
-            </style>
-            """, unsafe_allow_html=True)
-
+# Llamada a la función (asegúrate de que la ruta sea correcta)
 path_css = os.path.join(root_path, "styles", "custom.css")
 local_css(path_css)
 
@@ -88,8 +62,12 @@ def get_base64_image(image_path):
 # Constantes Globales
 ORDEN_RIESGO = ["Riesgo muy alto", "Riesgo alto", "Riesgo medio", "Riesgo bajo", "Sin Riesgo", "Dato perdido"]
 COLORES_RIESGO = {
-    "Sin Riesgo": "#2ECC71", "Riesgo bajo": "#ABEBC6", "Riesgo medio": "#F4D03F",
-    "Riesgo alto": "#E67E22", "Riesgo muy alto": "#C0392B", "Dato perdido": "#D3D3D3"
+    "Sin Riesgo": "#43DF1C", 
+    "Riesgo bajo": "#96FFE3", 
+    "Riesgo medio": "#FFDC4F",
+    "Riesgo alto": "#FF8A00", 
+    "Riesgo muy alto": "#D33A34", 
+    "Dato perdido": "#D3D3D3"
 }
 
 # Inicialización de estados
@@ -296,9 +274,26 @@ if archivo is not None:
                         "Retroal. Desempeño", 
                         "Relación colaboradores"
                     ],
+                    "Control sobre el Trabajo": [
+                        "Claridad de Rol",
+                        "Capacitación",
+                        "Participación y manejo del cambio",
+                        "Oportunidades para el desarrollo",
+                        "e Control y autonomia sobre el trabajo"
+                    ],
+                    "Demandas del Trabajo": [
+                        "Demandas cuantitativas",
+                        "Demandas emocionales",
+                        "Demandas de carga mental",
+                        "Demandas ambientales y de esfuerzo fisico",
+                        "Demandas de jornada laboral",
+                        "Exigencias de responsabilidad",
+                        "Consistencia de rol",
+                        "Influencia sobre el entorno extra"
+                    ],
                     "Recompensas": [
                         "Reconocimiento y compensación",
-                        "Recompensas derivadas de la pertenencia a la organización y del trabajo que se realiza"
+                        "Recompensas de pertenencia y trabajo"
                     ]
                 }
 
@@ -345,17 +340,59 @@ if archivo is not None:
                             # Usamos tu función genérica para buscar la tabla
                             df_dim = extraer_tabla_por_titulo(df_informe, nombre_dimension, area_sel) # <-- Agregamos area_sel
                             
+                            # --- DENTRO DEL BUCLE DE DIMENSIONES ---
                             if not df_dim.empty and "Valor" in df_dim.columns:
-                                if df_dim["Valor"].sum() > 0:
-                                    with st.expander(f"📌 {nombre_dimension.upper()}", expanded=True):
-                                        fig = px.bar(df_dim, x='Valor', y='Nivel', orientation='h',
-                                                     color='Nivel', color_discrete_map=COLORES_RIESGO,
-                                                     text=df_dim['Valor'].apply(lambda x: f'{x:.1f}%'))
-                                        
-                                        fig.update_layout(height=250, showlegend=False, margin=dict(t=0,b=0))
-                                        st.plotly_chart(fig, use_container_width=True, key=f"chart_{idx}")
+                                # 1. CÁLCULO SEGÚN NUEVOS PARÁMETROS
+                                # Sumamos Alto + Muy Alto para la métrica general
+                                val_alto = df_dim[df_dim["Nivel"] == "Riesgo alto"]["Valor"].sum()
+                                val_muy_alto = df_dim[df_dim["Nivel"] == "Riesgo muy alto"]["Valor"].sum()
+                                riesgo_total_critico = val_alto + val_muy_alto
+
+                                # LÓGICA DE CATEGORIZACIÓN REFORMULADA
+                                if riesgo_total_critico >= 85.0:
+                                    clase_tarjeta = "bg-muy-alto"
+                                    emoji = "🛑"
+                                    label_texto = "RIESGO MUY ALTO"
+                                elif riesgo_total_critico >= 70.0:
+                                    clase_tarjeta = "bg-alto"
+                                    emoji = "⚠️"
+                                    label_texto = "RIESGO ALTO"
+                                elif riesgo_total_critico >= 50.0:
+                                    clase_tarjeta = "bg-medio"
+                                    emoji = "🔸"
+                                    label_texto = "RIESGO MEDIO"
                                 else:
-                                    st.warning(f"La dimensión '{nombre_dimension}' tiene valores en cero.")
+                                    clase_tarjeta = "bg-normal"
+                                    emoji = "📊"
+                                    label_texto = "RIESGO CONTROLADO"
+
+                                with st.expander(f"{emoji} {nombre_dimension.upper()}", expanded=True):
+                                    st.markdown(f"""
+                                        <div class="risk-card {clase_tarjeta}">
+                                            <div class="label">{label_texto}</div>
+                                            <div class="value">{riesgo_total_critico:.1f}%</div>
+                                        </div>
+                                    """, unsafe_allow_html=True)
+                                    
+                                    # Gráfica (Sin cambios, pero con márgenes fijos)
+                                    fig = px.bar(df_dim, x='Valor', y='Nivel', orientation='h',
+                                                color='Nivel', color_discrete_map=COLORES_RIESGO,
+                                                text=df_dim['Valor'].apply(lambda x: f'{x:.1f}%'))
+
+                                    fig.update_layout(
+                                        height=220, 
+                                        showlegend=False, 
+                                        margin=dict(t=5, b=5, l=0, r=50),
+                                        paper_bgcolor="rgba(0,0,0,0)",
+                                        plot_bgcolor="rgba(0,0,0,0)",
+                                        xaxis_visible=False,
+                                        yaxis_title="",
+                                        yaxis={'categoryorder':'array', 'categoryarray': ORDEN_RIESGO[::-1]}
+                                    )
+                                    
+                                    fig.update_traces(textposition='outside', marker_line_width=0)
+                                    st.plotly_chart(fig, use_container_width=True, key=f"chart_refac_{idx}")
+
                             else:
                                 # Si sale este error, es porque el nombre en el Excel es diferente
                                 st.error(f"❌ No se encontró la tabla: '{nombre_dimension}'")

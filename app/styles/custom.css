@@ -1,0 +1,78 @@
+/* 1. DISEÑO DE LA NEON CARD (LA TARJETA LLAMATIVA) */
+.risk-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px 15px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    text-transform: uppercase;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.4);
+    border: 2px solid rgba(255,255,255,0.1);
+}
+
+.risk-card .value {
+    font-size: 38px; /* Un pelín más grande para que sea el protagonista total */
+    font-weight: 900;
+    color: white;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+    line-height: 1; /* Para que no deje espacio extra abajo */
+}
+
+/* --- ESTADOS DE LA TARJETA --- */
+
+/* 🔵 NORMAL (0-49%) */
+.bg-normal { 
+    background: linear-gradient(135deg, #1A5276 0%, #154360 100%) !important; 
+    border: 2px solid #2E86C1 !important;
+}
+
+/* 🟠 MEDIO (50-69% | Naranja Claro) */
+.bg-medio { 
+    background: linear-gradient(135deg, #F39C12 0%, #D68910 100%) !important; 
+    border: 2px solid #FAD7A0 !important;
+    box-shadow: 0 0 12px rgba(243, 156, 18, 0.4) !important;
+}
+
+/* 🔸 ALTO (70-84% | Naranja Intenso/Ámbar) */
+.bg-alto { 
+    background: linear-gradient(135deg, #E67E22 0%, #A04000 100%) !important; 
+    border: 2px solid #EB984E !important;
+    box-shadow: 0 0 15px rgba(230, 126, 34, 0.5) !important;
+}
+
+/* 🔴 MUY ALTO (85-100% | Rojo) */
+.bg-muy-alto { 
+    background: linear-gradient(135deg, #D33A34 0%, #7B1F1C 100%) !important; 
+    border: 2px solid #FF4B4B !important;
+    box-shadow: 0 0 20px rgba(211, 58, 52, 0.6) !important;
+}
+
+/* --- AJUSTE DE BORDES DEL EXPANDER --- */
+div[data-testid="stExpander"]:has(.bg-medio) { border: 2px solid #F39C12 !important; background-color: rgba(243, 156, 18, 0.02) !important; }
+div[data-testid="stExpander"]:has(.bg-alto) { border: 2px solid #E67E22 !important; background-color: rgba(230, 126, 34, 0.04) !important; }
+div[data-testid="stExpander"]:has(.bg-muy-alto) { border: 2px solid #D33A34 !important; background-color: rgba(211, 58, 52, 0.06) !important; }
+
+/* 2. MODO ALERTA: CAMBIAR EL PANEL COMPLETO (EXPANDER) */
+
+/* Si hay Riesgo Alto (Naranja) */
+div[data-testid="stExpander"]:has(.bg-alto) {
+    border: 2px solid #FF8A00 !important;
+    background-color: rgba(255, 138, 0, 0.03) !important;
+    border-radius: 12px !important;
+}
+
+/* Si hay Riesgo Muy Alto (Rojo) */
+div[data-testid="stExpander"]:has(.bg-muy-alto) {
+    border: 2px solid #D33A34 !important;
+    background-color: rgba(211, 58, 52, 0.05) !important;
+    border-radius: 12px !important;
+}
+
+/* Forzar alineación de cabeceras */
+div[data-testid="stExpander"] summary {
+    min-height: 3.5rem !important;
+    display: flex !important;
+    align-items: center !important;
+}
