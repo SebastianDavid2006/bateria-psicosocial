@@ -76,3 +76,48 @@ div[data-testid="stExpander"] summary {
     display: flex !important;
     align-items: center !important;
 }
+
+/* Tarjeta de Estrategia dentro del Popover */
+.strategy-box {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border-radius: 10px !important;
+    padding: 15px !important;
+    margin-bottom: 12px !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    transition: all 0.3s ease;
+}
+
+.strategy-box:hover {
+    background: rgba(255, 255, 255, 0.12) !important;
+    border-color: rgba(255, 255, 255, 0.3) !important;
+    transform: translateX(5px);
+}
+
+.strategy-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 5px;
+    font-size: 10px;
+    font-weight: bold;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    letter-spacing: 0.5px;
+}
+
+/* Estilo para que el diálogo parezca una tarjeta flotante premium */
+div[data-testid="stDialog"] div[role="dialog"] {
+    background-color: rgba(25, 25, 35, 0.85) !important;
+    backdrop-filter: blur(15px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 20px !important;
+    box-shadow: 0 25px 50px rgba(0,0,0,0.5) !important;
+}
+
+/* Las tarjetas de estrategia dentro del diálogo */
+.strategy-card-modal {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 20px;
+    border-radius: 15px;
+    margin-bottom: 15px;
+    border-left: 6px solid #43DF1C; /* Color por defecto */
+}

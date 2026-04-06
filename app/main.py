@@ -23,9 +23,21 @@ try:
     from components.tabs_view import render_tabs
     from components.explorador import render_explorador_dinamico
     from utils.catalogo_acciones import obtener_diagnostico_completo
+    from utils.estrategias import ESTRATEGIAS_MANUAL
 except ModuleNotFoundError as e:
     st.error(f"❌ Error al cargar módulos internos: {e}")
     st.stop()
+
+# Función para asignar colores a los tipos de acción
+def obtener_color_tipo(tipo_accion):
+    tipo = tipo_accion.lower()
+    if "primaria" in tipo:
+        return "#00b4d8"  # Azul claro (Educación / Prevención base)
+    elif "secundaria" in tipo:
+        return "#ffb703"  # Amarillo/Naranja (Alerta / Intervención focalizada)
+    elif "terciaria" in tipo:
+        return "#e63946"  # Rojo (Choque / Rehabilitación / Crisis)
+    return "#8d99ae"      # Gris por defecto
 
 @st.dialog("📊 Diagnóstico de Riesgo Psicosocial")
 def mostrar_analisis_modal(titulo, contenido):
@@ -36,6 +48,34 @@ def mostrar_analisis_modal(titulo, contenido):
         st.markdown(contenido)
     
     if st.button("✅ Entendido", use_container_width=True):
+        st.rerun()
+
+@st.dialog("🎯 Plan de Acción Estratégico", width="large")
+def mostrar_estrategias_modal(dimension, nivel, estrategias):
+    st.markdown(f"### {dimension}")
+    st.markdown(f"**Nivel de Riesgo detectado:** `{nivel}`")
+    st.divider()
+    
+    if estrategias:
+        for plan in estrategias:
+            color_b = obtener_color_tipo(plan.get("tipo", ""))
+            st.markdown(f"""
+                <div class="strategy-card-modal" style="border-left-color: {color_b} !important;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <span style="background: {color_b}; color: white; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: bold;">
+                            {plan.get('tipo').upper()}
+                        </span>
+                        <span style="opacity: 0.6; font-size: 12px;">📍 {plan.get('responsable', 'RRHH')}</span>
+                    </div>
+                    <div style="font-size: 16px; color: #f0f2f6; line-height: 1.5; font-weight: 500;">
+                        {plan.get('accion')}
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+    else:
+        st.info("No se requieren acciones críticas según los parámetros actuales.")
+    
+    if st.button("Cerrar", use_container_width=True):
         st.rerun()
 
 # --- 3. CONFIGURACIÓN DE PÁGINA ---
@@ -335,67 +375,91 @@ if archivo is not None:
                     grid_cols = st.columns(2)
                     
                     for idx, nombre_dimension in enumerate(dimensiones_a_procesar):
-                        # Alternamos entre columna 1 y 2
+                        # --- DENTRO DEL BUCLE DE DIMENSIONES ---
                         with grid_cols[idx % 2]:
-                            # Usamos tu función genérica para buscar la tabla
-                            df_dim = extraer_tabla_por_titulo(df_informe, nombre_dimension, area_sel) # <-- Agregamos area_sel
+                            # 1. Extraer los datos primero
+                            df_dim = extraer_tabla_por_titulo(df_informe, nombre_dimension, area_sel)
                             
-                            # --- DENTRO DEL BUCLE DE DIMENSIONES ---
                             if not df_dim.empty and "Valor" in df_dim.columns:
-                                # 1. CÁLCULO SEGÚN NUEVOS PARÁMETROS
-                                # Sumamos Alto + Muy Alto para la métrica general
+                                # 2. INICIALIZAR VARIABLES (Evita el error 'not defined')
+                                emoji = "📊" 
+                                clase_tarjeta = "bg-normal"
+                                label_texto = "RIESGO CONTROLADO"
+                                nivel_key = "Sin Riesgo"
+                                
+                                # 3. CÁLCULOS DE RIESGO
                                 val_alto = df_dim[df_dim["Nivel"] == "Riesgo alto"]["Valor"].sum()
                                 val_muy_alto = df_dim[df_dim["Nivel"] == "Riesgo muy alto"]["Valor"].sum()
                                 riesgo_total_critico = val_alto + val_muy_alto
 
-                                # LÓGICA DE CATEGORIZACIÓN REFORMULADA
+                                # 4. LÓGICA DE CATEGORIZACIÓN (Asignación de variables para el visual)
                                 if riesgo_total_critico >= 85.0:
-                                    clase_tarjeta = "bg-muy-alto"
-                                    emoji = "🛑"
-                                    label_texto = "RIESGO MUY ALTO"
+                                    clase_tarjeta, emoji, label_texto, nivel_key = "bg-muy-alto", "🛑", "RIESGO MUY ALTO", "Muy Alto"
                                 elif riesgo_total_critico >= 70.0:
-                                    clase_tarjeta = "bg-alto"
-                                    emoji = "⚠️"
-                                    label_texto = "RIESGO ALTO"
+                                    clase_tarjeta, emoji, label_texto, nivel_key = "bg-alto", "⚠️", "RIESGO ALTO", "Alto"
                                 elif riesgo_total_critico >= 50.0:
-                                    clase_tarjeta = "bg-medio"
-                                    emoji = "🔸"
-                                    label_texto = "RIESGO MEDIO"
-                                else:
-                                    clase_tarjeta = "bg-normal"
-                                    emoji = "📊"
-                                    label_texto = "RIESGO CONTROLADO"
+                                    clase_tarjeta, emoji, label_texto, nivel_key = "bg-medio", "🔸", "RIESGO MEDIO", "Medio"
+                                elif riesgo_total_critico >= 10.0:
+                                    clase_tarjeta, emoji, label_texto, nivel_key = "bg-bajo", "🔹", "RIESGO BAJO", "Bajo"
 
+                                # 5. GENERAR GRÁFICA (La creamos antes de mostrarla)
+                                fig = px.bar(df_dim, x='Valor', y='Nivel', orientation='h',
+                                            color='Nivel', color_discrete_map=COLORES_RIESGO,
+                                            text=df_dim['Valor'].apply(lambda x: f'{x:.1f}%'))
+
+                                fig.update_layout(
+                                    height=220, showlegend=False, margin=dict(t=5, b=5, l=0, r=50),
+                                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                                    xaxis_visible=False, yaxis_title="",
+                                    yaxis={'categoryorder':'array', 'categoryarray': ORDEN_RIESGO[::-1]}
+                                )
+                                fig.update_traces(textposition='outside', marker_line_width=0)
+
+                                # 6. RENDERIZADO VISUAL (Ahora que todo está definido)
                                 with st.expander(f"{emoji} {nombre_dimension.upper()}", expanded=True):
-                                    st.markdown(f"""
-                                        <div class="risk-card {clase_tarjeta}">
-                                            <div class="label">{label_texto}</div>
-                                            <div class="value">{riesgo_total_critico:.1f}%</div>
-                                        </div>
-                                    """, unsafe_allow_html=True)
+                                    # Cabecera: Métrica + Botón Popover
+                                    col_metrica, col_accion = st.columns([3, 1.2])
                                     
-                                    # Gráfica (Sin cambios, pero con márgenes fijos)
-                                    fig = px.bar(df_dim, x='Valor', y='Nivel', orientation='h',
-                                                color='Nivel', color_discrete_map=COLORES_RIESGO,
-                                                text=df_dim['Valor'].apply(lambda x: f'{x:.1f}%'))
+                                    with col_metrica:
+                                        st.markdown(f"""
+                                            <div class="risk-card {clase_tarjeta}">
+                                                <div class="label">{label_texto}</div>
+                                                <div class="value">{riesgo_total_critico:.1f}%</div>
+                                            </div>
+                                        """, unsafe_allow_html=True)
+                                        
+                                    with col_accion:
+                                        lista_planes = ESTRATEGIAS_MANUAL.get(nombre_dimension, {}).get(nivel_key, [])
+                                        
+                                        if st.button("🚀 Ver Plan", key=f"btn_modal_{idx}", use_container_width=True):
+                                            mostrar_estrategias_modal(nombre_dimension, nivel_key, lista_planes)
+                                            if lista_planes:
+                                                for plan in lista_planes:
+                                                    color_b = obtener_color_tipo(plan.get("tipo", ""))
+                                                    # --- NUEVO DISEÑO RESALTADO ---
+                                                    st.markdown(f"""
+                                                        <div class="strategy-box" style="border-left: 5px solid {color_b} !important;">
+                                                            <div class="strategy-badge" style="background: {color_b}33; color: {color_b}; border: 1px solid {color_b};">
+                                                                {plan.get('tipo')}
+                                                            </div>
+                                                            <div style="margin-bottom: 10px; color: white; font-size: 15px; line-height: 1.4;">
+                                                                {plan.get('accion')}
+                                                            </div>
+                                                            <div style="display: flex; justify-content: space-between; align-items: center; opacity: 0.7; font-size: 12px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">
+                                                                <span>👤 <b>Responsable:</b> {plan.get('responsable', 'RRHH')}</span>
+                                                                <span style="font-style: italic;">Prioridad Alta</span>
+                                                            </div>
+                                                        </div>
+                                                    """, unsafe_allow_html=True)
+                                            else:
+                                                st.write("No se requieren acciones críticas.")
+                                                if st.button("IA: Generar Alternativa", key=f"ia_gen_{idx}"):
+                                                    st.info("Consultando sugerencia...")
 
-                                    fig.update_layout(
-                                        height=220, 
-                                        showlegend=False, 
-                                        margin=dict(t=5, b=5, l=0, r=50),
-                                        paper_bgcolor="rgba(0,0,0,0)",
-                                        plot_bgcolor="rgba(0,0,0,0)",
-                                        xaxis_visible=False,
-                                        yaxis_title="",
-                                        yaxis={'categoryorder':'array', 'categoryarray': ORDEN_RIESGO[::-1]}
-                                    )
-                                    
-                                    fig.update_traces(textposition='outside', marker_line_width=0)
-                                    st.plotly_chart(fig, use_container_width=True, key=f"chart_refac_{idx}")
-
+                                    # Gráfica principal
+                                    st.plotly_chart(fig, use_container_width=True, key=f"chart_modern_{idx}")
                             else:
-                                # Si sale este error, es porque el nombre en el Excel es diferente
-                                st.error(f"❌ No se encontró la tabla: '{nombre_dimension}'")
+                                st.error(f"❌ No se encontró la tabla o está vacía: '{nombre_dimension}'")
 
                 except Exception as e:
                     st.error(f"⚠️ Error en la vista de dominios: {e}")
