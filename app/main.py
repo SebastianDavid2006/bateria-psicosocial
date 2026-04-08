@@ -78,6 +78,18 @@ def mostrar_estrategias_modal(dimension, nivel, estrategias):
     if st.button("Cerrar", use_container_width=True):
         st.rerun()
 
+@st.dialog("📊 Análisis Ejecutivo para Líderes")
+def mostrar_reporte_ia_modal(dimension, area, analisis):
+    st.write(f"### Dimensión: {dimension}")
+    st.caption(f"📍 Análisis personalizado para el área de **{area}**")
+    st.divider()
+    
+    with st.container(height=350, border=False):
+        st.markdown(analisis)
+    
+    if st.button("Cerrar", use_container_width=True):
+        st.rerun()
+
 # --- 3. CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Batería Psicosocial AI", layout="wide")
 
@@ -180,20 +192,11 @@ if archivo is not None:
 
         # --- CONTENIDO ESPECÍFICO DE CONSOLIDADO (T3) ---
         with t3:
-            # --- NUEVA SECCIÓN DE PARÁMETROS IA ---
-            with st.expander("⚙️ Configuración del Plan de Acción (IA)"):
-                col_p1, col_p2 = st.columns(2)
-                with col_p1:
-                    formato_ia = st.selectbox("Formato", ["Lista de viñetas", "Párrafo ejecutivo", "Tabla de tareas"])
-                    tono_ia = st.selectbox("Tono", ["Profesional y Técnico", "Directo y Ejecutivo", "Motivacional"])
-                with col_p2:
-                    max_palabras = st.slider("Extensión máxima (palabras)", 50, 500, 150)
-            
-            # Guardamos la configuración en un diccionario para la función
+            # --- CONFIGURACIÓN IA POR DEFECTO ---
             config_ia = {
-                "formato": formato_ia,
-                "tono": tono_ia,
-                "max_palabras": max_palabras
+                "formato": "Lista de viñetas",
+                "tono": "Profesional y Técnico",
+                "max_palabras": 150
             }
 
             if not st.session_state['ver_subdimensiones_intra']:
@@ -428,33 +431,30 @@ if archivo is not None:
                                             </div>
                                         """, unsafe_allow_html=True)
                                         
-                                    with col_accion:
-                                        lista_planes = ESTRATEGIAS_MANUAL.get(nombre_dimension, {}).get(nivel_key, [])
-                                        
-                                        if st.button("🚀 Ver Plan", key=f"btn_modal_{idx}", use_container_width=True):
-                                            mostrar_estrategias_modal(nombre_dimension, nivel_key, lista_planes)
-                                            if lista_planes:
-                                                for plan in lista_planes:
-                                                    color_b = obtener_color_tipo(plan.get("tipo", ""))
-                                                    # --- NUEVO DISEÑO RESALTADO ---
-                                                    st.markdown(f"""
-                                                        <div class="strategy-box" style="border-left: 5px solid {color_b} !important;">
-                                                            <div class="strategy-badge" style="background: {color_b}33; color: {color_b}; border: 1px solid {color_b};">
-                                                                {plan.get('tipo')}
-                                                            </div>
-                                                            <div style="margin-bottom: 10px; color: white; font-size: 15px; line-height: 1.4;">
-                                                                {plan.get('accion')}
-                                                            </div>
-                                                            <div style="display: flex; justify-content: space-between; align-items: center; opacity: 0.7; font-size: 12px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">
-                                                                <span>👤 <b>Responsable:</b> {plan.get('responsable', 'RRHH')}</span>
-                                                                <span style="font-style: italic;">Prioridad Alta</span>
-                                                            </div>
-                                                        </div>
-                                                    """, unsafe_allow_html=True)
-                                            else:
-                                                st.write("No se requieren acciones críticas.")
-                                                if st.button("IA: Generar Alternativa", key=f"ia_gen_{idx}"):
-                                                    st.info("Consultando sugerencia...")
+                                        with col_accion:
+                                            # --- BOTÓN 1: REPORTE IA ---
+                                            if st.button("📊 Reporte IA", key=f"ai_rep_{idx}", use_container_width=True):
+                                                with st.spinner("🤖 Gemini analizando impacto..."):
+                                                    datos_tabla = df_dim[['Nivel', 'Valor']].to_string(index=False)
+                                                    prompt = f"""
+                                                    Actúa como consultor senior. 
+                                                    Explica al jefe del área de {area_sel} el impacto operativo de estos 
+                                                    resultados en la dimensión {nombre_dimension}:
+                                                    {datos_tabla}
+                                                    Sé breve, usa viñetas y enfócate en productividad y clima.
+                                                    """
+                                                    respuesta = consultar_gemini(prompt)
+                                                    mostrar_reporte_ia_modal(nombre_dimension, area_sel, respuesta)
+
+                                            # Espacio entre botones
+                                            st.write("") 
+
+                                            # --- BOTÓN 2: VER PLAN ---
+                                            # Obtenemos la lista pero NO la recorremos aquí con un 'for'
+                                            lista_planes = ESTRATEGIAS_MANUAL.get(nombre_dimension, {}).get(nivel_key, [])
+                                            
+                                            if st.button("🚀 Ver Plan", key=f"btn_plan_{idx}", use_container_width=True, type="primary"):
+                                                mostrar_estrategias_modal(nombre_dimension, nivel_key, lista_planes)
 
                                     # Gráfica principal
                                     st.plotly_chart(fig, use_container_width=True, key=f"chart_modern_{idx}")
