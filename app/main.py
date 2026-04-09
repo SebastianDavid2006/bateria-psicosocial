@@ -514,7 +514,16 @@ if archivo is not None:
                     riesgos_todas = st.session_state[cache_key]
                     
                     if riesgos_todas and riesgos_todas[0][1] > 0:
-                        st.markdown('<p style="text-align: center; font-size: 16px; font-weight: 600; margin-bottom: 10px;">Áreas con Mayor Riesgo</p>', unsafe_allow_html=True)
+                        st.divider()
+                        # Fila título + botón (botón debajo pero alineado a la derecha)
+                        st.markdown('<p style="font-size: 16px; font-weight: 600; margin: 0;">Áreas con Mayor Riesgo</p>', unsafe_allow_html=True)
+                        
+                        with st.container():
+                            col_btn = st.columns([1])
+                            with col_btn[0]:
+                                if st.button("📊 Ver más", key="btn_ver_todas", use_container_width=False):
+                                    st.session_state['mostrar_todas_areas'] = True
+                        
                         cols_areas = st.columns(3)
                         for i in range(min(3, len(riesgos_todas))):
                             area, riesgo, nivel, color = riesgos_todas[i]
@@ -541,9 +550,6 @@ if archivo is not None:
                                     <div style="font-size: 11px; color: rgba(255,255,255,0.85); margin-top: 5px; font-weight: 500;">{nivel}</div>
                                 </div>""", unsafe_allow_html=True)
                         st.write("")
-                        
-                        if st.button("Ver todas las áreas", use_container_width=True, type="tertiary"):
-                            st.session_state['mostrar_todas_areas'] = True
                         
                         if 'mostrar_todas_areas' not in st.session_state:
                             st.session_state['mostrar_todas_areas'] = False
