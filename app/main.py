@@ -541,6 +541,50 @@ if archivo is not None:
                                     <div style="font-size: 11px; color: rgba(255,255,255,0.85); margin-top: 5px; font-weight: 500;">{nivel}</div>
                                 </div>""", unsafe_allow_html=True)
                         st.write("")
+                        
+                        if st.button("Ver todas las áreas", use_container_width=True, type="tertiary"):
+                            st.session_state['mostrar_todas_areas'] = True
+                        
+                        if 'mostrar_todas_areas' not in st.session_state:
+                            st.session_state['mostrar_todas_areas'] = False
+                        
+                        if st.session_state['mostrar_todas_areas'] and riesgos_todas:
+                            @st.dialog("Todas las Áreas por Nivel de Riesgo")
+                            def mostrar_todas_areas_modal():    
+                                
+                                # Contenedor con márgenes internos
+                                with st.container(height=450, border=False):
+                                    for area, riesgo, nivel, color in riesgos_todas:
+                                        if "Muy Alto" in nivel:
+                                            gradiente = "linear-gradient(145deg, #c0392b 0%, #8e2a1f 50%, #5c1914 100%)"
+                                            borde = "#e74c3c"
+                                        elif "Alto" in nivel:
+                                            gradiente = "linear-gradient(145deg, #d35400 0%, #a04000 50%, #6e2c00 100%)"
+                                            borde = "#e67e22"
+                                        elif "Medio" in nivel:
+                                            gradiente = "linear-gradient(145deg, #f39c12 0%, #d68910 50%, #b9770e 100%)"
+                                            borde = "#f1c40f"
+                                        elif "Bajo" in nivel:
+                                            gradiente = "linear-gradient(145deg, #27ae60 0%, #1e8449 50%, #145a32 100%)"
+                                            borde = "#2ecc71"
+                                        else:
+                                            gradiente = "linear-gradient(145deg, #1abc9c 0%, #16a085 50%, #117a65 100%)"
+                                            borde = "#1abc9c"
+                                        
+                                        st.markdown(f"""<div style="background: {gradiente}; border-radius: 12px; padding: 16px; border: 2px solid {borde}; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
+                                            <div style="font-size: 15px; color: white; font-weight: 600;">{area}</div>
+                                            <div style="text-align: right;">
+                                                <div style="font-size: 22px; font-weight: bold; color: white;">{int(riesgo)}%</div>
+                                                <div style="font-size: 10px; color: rgba(255,255,255,0.85);">{nivel}</div>
+                                            </div>
+                                        </div>""", unsafe_allow_html=True)
+                                
+                                st.write("")
+                                if st.button("Cerrar", use_container_width=True):
+                                    st.session_state['mostrar_todas_areas'] = False
+                                    st.rerun()
+                            
+                            mostrar_todas_areas_modal()
 
                     # --- TOP 3 DIMENSIONES CON MAYOR RIESGO (GENERAL) - Cache por área ---
                     cache_key_dimensiones = f"riesgos_dimensiones_{area_sel}"
