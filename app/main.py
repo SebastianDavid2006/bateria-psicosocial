@@ -514,7 +514,7 @@ if archivo is not None:
                     riesgos_todas = st.session_state[cache_key]
                     
                     if riesgos_todas and riesgos_todas[0][1] > 0:
-                        st.divider()
+                        st.write("")
                         # Fila título + botón (botón debajo pero alineado a la derecha)
                         st.markdown('<p style="font-size: 16px; font-weight: 600; margin: 0;">Áreas con Mayor Riesgo</p>', unsafe_allow_html=True)
                         
@@ -611,7 +611,16 @@ if archivo is not None:
                     todos_riesgos = st.session_state[cache_key_dimensiones]
                     
                     if todos_riesgos and todos_riesgos[0][1] > 0:
-                        st.markdown('<p style="text-align: center; font-size: 16px; font-weight: 600; margin-bottom: 10px;">Dimensiones con Mayor Riesgo General</p>', unsafe_allow_html=True)
+                        st.write("")
+                        # Título + botón
+                        st.markdown('<p style="font-size: 16px; font-weight: 600; margin: 0;">Dimensiones con Mayor Riesgo General</p>', unsafe_allow_html=True)
+                        
+                        with st.container():
+                            col_btn = st.columns([1])
+                            with col_btn[0]:
+                                if st.button("📊 Ver más", key="btn_ver_todas_dim_gen", use_container_width=False):
+                                    st.session_state['mostrar_todas_dimensiones'] = True
+                        
                         cols_top = st.columns(3)
                         for i in range(min(3, len(todos_riesgos))):
                             dim, riesgo, dom = todos_riesgos[i]
@@ -655,6 +664,49 @@ if archivo is not None:
 
                     st.write("")
                     
+                    # Modal para todas las dimensiones (General)
+                    if st.session_state.get('mostrar_todas_dimensiones', False) and todos_riesgos:
+                        @st.dialog("Todas las Dimensiones por Nivel de Riesgo")
+                        def mostrar_todas_dimensiones_modal():
+                            
+                            with st.container(height=450, border=False):
+                                for dim, riesgo, dom in todos_riesgos:
+                                    if riesgo >= 85:
+                                        gradiente = "linear-gradient(145deg, #c0392b 0%, #8e2a1f 50%, #5c1914 100%)"
+                                        borde = "#e74c3c"
+                                        nivel_texto = "Riesgo Muy Alto"
+                                    elif riesgo >= 70:
+                                        gradiente = "linear-gradient(145deg, #d35400 0%, #a04000 50%, #6e2c00 100%)"
+                                        borde = "#e67e22"
+                                        nivel_texto = "Riesgo Alto"
+                                    elif riesgo >= 50:
+                                        gradiente = "linear-gradient(145deg, #f39c12 0%, #d68910 50%, #b9770e 100%)"
+                                        borde = "#f1c40f"
+                                        nivel_texto = "Riesgo Medio"
+                                    elif riesgo >= 30:
+                                        gradiente = "linear-gradient(145deg, #27ae60 0%, #1e8449 50%, #145a32 100%)"
+                                        borde = "#2ecc71"
+                                        nivel_texto = "Riesgo Bajo"
+                                    else:
+                                        gradiente = "linear-gradient(145deg, #1abc9c 0%, #16a085 50%, #117a65 100%)"
+                                        borde = "#1abc9c"
+                                        nivel_texto = "Sin Riesgo"
+                                    
+                                    st.markdown(f"""<div style="background: {gradiente}; border-radius: 12px; padding: 16px; border: 2px solid {borde}; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
+                                        <div style="font-size: 15px; color: white; font-weight: 600;">{dim}</div>
+                                        <div style="text-align: right;">
+                                            <div style="font-size: 22px; font-weight: bold; color: white;">{int(riesgo)}%</div>
+                                            <div style="font-size: 10px; color: rgba(255,255,255,0.85);">{nivel_texto}</div>
+                                        </div>
+                                    </div>""", unsafe_allow_html=True)
+                            
+                            st.write("")
+                            if st.button("Cerrar", use_container_width=True):
+                                st.session_state['mostrar_todas_dimensiones'] = False
+                                st.rerun()
+                        
+                        mostrar_todas_dimensiones_modal()
+                    
                     # --- TOP 4 DIMENSIONES CON MAYOR RIESGO (DEL DOMINIO) - Cache por área y dominio ---
                     dimensiones_a_procesar = DOMINIOS_MAP[dominio_sel]
                     
@@ -675,7 +727,16 @@ if archivo is not None:
                     riesgos_dim = st.session_state[cache_key_domain]
                     
                     if riesgos_dim and riesgos_dim[0][1] > 0:
-                        st.markdown('<p style="text-align: center; font-size: 16px; font-weight: 600; margin-bottom: 10px;">Dimensiones con Mayor Riesgo en este Dominio</p>', unsafe_allow_html=True)
+                        st.write("")
+                        # Título + botón
+                        st.markdown('<p style="font-size: 16px; font-weight: 600; margin: 0;">Dimensiones con Mayor Riesgo en este Dominio</p>', unsafe_allow_html=True)
+                        
+                        with st.container():
+                            col_btn = st.columns([1])
+                            with col_btn[0]:
+                                if st.button("📊 Ver más", key="btn_ver_todas_dim_dom", use_container_width=False):
+                                    st.session_state['mostrar_todas_dominio'] = True
+                        
                         cols_criticas = st.columns(min(4, len(riesgos_dim)))
                         for i, (dim, riesgo) in enumerate(riesgos_dim[:4]):
                             if riesgo > 0:
@@ -697,6 +758,50 @@ if archivo is not None:
                                     </div>""", unsafe_allow_html=True)
                         
                         st.divider()
+
+                    # Modal para todas las dimensiones del dominio
+                    if st.session_state.get('mostrar_todas_dominio', False) and riesgos_dim:
+                        @st.dialog("Todas las Dimensiones del Dominio")
+                        def mostrar_todas_dominio_modal():
+                            st.markdown(f"### {dominio_sel}")
+                            
+                            with st.container(height=450, border=False):
+                                for dim, riesgo in riesgos_dim:
+                                    if riesgo >= 85:
+                                        gradiente = "linear-gradient(145deg, #c0392b 0%, #8e2a1f 50%, #5c1914 100%)"
+                                        borde = "#e74c3c"
+                                        nivel_texto = "Riesgo Muy Alto"
+                                    elif riesgo >= 70:
+                                        gradiente = "linear-gradient(145deg, #d35400 0%, #a04000 50%, #6e2c00 100%)"
+                                        borde = "#e67e22"
+                                        nivel_texto = "Riesgo Alto"
+                                    elif riesgo >= 50:
+                                        gradiente = "linear-gradient(145deg, #f39c12 0%, #d68910 50%, #b9770e 100%)"
+                                        borde = "#f1c40f"
+                                        nivel_texto = "Riesgo Medio"
+                                    elif riesgo >= 30:
+                                        gradiente = "linear-gradient(145deg, #27ae60 0%, #1e8449 50%, #145a32 100%)"
+                                        borde = "#2ecc71"
+                                        nivel_texto = "Riesgo Bajo"
+                                    else:
+                                        gradiente = "linear-gradient(145deg, #1abc9c 0%, #16a085 50%, #117a65 100%)"
+                                        borde = "#1abc9c"
+                                        nivel_texto = "Sin Riesgo"
+                                    
+                                    st.markdown(f"""<div style="background: {gradiente}; border-radius: 12px; padding: 16px; border: 2px solid {borde}; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
+                                        <div style="font-size: 15px; color: white; font-weight: 600;">{dim}</div>
+                                        <div style="text-align: right;">
+                                            <div style="font-size: 22px; font-weight: bold; color: white;">{int(riesgo)}%</div>
+                                            <div style="font-size: 10px; color: rgba(255,255,255,0.85);">{nivel_texto}</div>
+                                        </div>
+                                    </div>""", unsafe_allow_html=True)
+                            
+                            st.write("")
+                            if st.button("Cerrar", use_container_width=True):
+                                st.session_state['mostrar_todas_dominio'] = False
+                                st.rerun()
+                        
+                        mostrar_todas_dominio_modal()
 
                     # --- BUCLE DINÁMICO DE DIMENSIONES ---
                     # Esto reemplaza los bloques 'especialistas' manuales
