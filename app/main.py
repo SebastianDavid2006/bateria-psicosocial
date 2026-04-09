@@ -50,6 +50,64 @@ def mostrar_analisis_modal(titulo, contenido):
     if st.button("✅ Entendido", use_container_width=True):
         st.rerun()
 
+def crear_html_seccion(titulo, contenido):
+    numeros = {"OBJETIVO": "1", "BENEFICIOS": "2", "CONSIDERACIONES": "3"}
+    colores = {
+        "OBJETIVO": ("linear-gradient(135deg, #667eea 0%, #764ba2 100%)", "#667eea"),
+        "BENEFICIOS": ("linear-gradient(135deg, #11998e 0%, #38ef7d 100%)", "#11998e"),
+        "CONSIDERACIONES": ("linear-gradient(135deg, #f093fb 0%, #f5576c 100%)", "#f093fb")
+    }
+    num = numeros.get(titulo, "?")
+    gradiente, color_solido = colores.get(titulo, (colores["OBJETIVO"]))
+    
+    return f"""
+    <div style="display: flex; gap: 10px; align-items: stretch; margin-bottom: 5px;">
+        <div style="background: {gradiente}; width: 50px; min-height: 60px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; color: white; flex-shrink: 0;">{num}</div>
+        <div style="background: #1e1e2e; border-radius: 10px; padding: 10px 15px; flex-grow: 1; border-left: 3px solid {color_solido};">
+            <div style="font-size: 12px; color: #888; margin-bottom: 5px; text-transform: uppercase;">{titulo}</div>
+            <div style="color: #e0e0e0; font-size: 14px;">{contenido}</div>
+        </div>
+    </div>
+    """
+
+@st.dialog("📊 Análisis de Estrategia", width="large")
+def mostrar_analisis_estrategia(dimension, estrategia, tipo):
+    st.markdown(f"### {estrategia}")
+    st.markdown(f"**Tipo:** `{tipo}`")
+    st.divider()
+    
+    with st.spinner("Generando análisis con IA..."):
+        prompt = f"""
+        Para la estrategia de prevención de riesgos psicosociales:
+        
+        Estrategia: {estrategia}
+        Tipo: {tipo}
+        Dimensión: {dimension}
+        
+        Proporciona:
+        1. OBJETIVO: ¿Qué busca lograr esta estrategia?
+        2. BENEFICIOS: ¿Qué beneficios trae a la organización y trabajadores?
+        3. CONSIDERACIONES: ¿Qué aspectos importantes deben considerarse para su implementación?
+        
+        Sé breve y concreto.
+        """
+        respuesta = consultar_gemini(prompt)
+    
+    partes = respuesta.split("\n\n")
+    for parte in partes:
+        if parte.strip().upper().startswith("OBJETIVO"):
+            contenido = parte.replace("OBJETIVO:", "").strip()
+            st.markdown(crear_html_seccion("OBJETIVO", contenido), unsafe_allow_html=True)
+        elif parte.strip().upper().startswith("BENEFICIO"):
+            contenido = parte.replace("BENEFICIOS:", "").replace("BENEFICIO:", "").strip()
+            st.markdown(crear_html_seccion("BENEFICIOS", contenido), unsafe_allow_html=True)
+        elif parte.strip().upper().startswith("CONSIDERAC"):
+            contenido = parte.replace("CONSIDERACIONES:", "").strip()
+            st.markdown(crear_html_seccion("CONSIDERACIONES", contenido), unsafe_allow_html=True)
+    
+    if st.button("Cerrar", use_container_width=True):
+        st.rerun()
+
 @st.dialog("🎯 Plan de Acción Estratégico", width="large")
 def mostrar_estrategias_modal(dimension, nivel, estrategias):
     st.markdown(f"### {dimension}")
@@ -57,7 +115,7 @@ def mostrar_estrategias_modal(dimension, nivel, estrategias):
     st.divider()
     
     if estrategias:
-        for plan in estrategias:
+        for idx, plan in enumerate(estrategias):
             color_b = obtener_color_tipo(plan.get("tipo", ""))
             st.markdown(f"""
                 <div class="strategy-card-modal" style="border-left-color: {color_b} !important;">
@@ -72,6 +130,39 @@ def mostrar_estrategias_modal(dimension, nivel, estrategias):
                     </div>
                 </div>
             """, unsafe_allow_html=True)
+            
+            # Usamos expander en lugar de dialog anidado
+            with st.expander("✨ Analizar con IA"):
+                with st.spinner("Generando análisis..."):
+                    prompt = f"""
+                    Para la estrategia de prevención de riesgos psicosociales:
+                    
+                    Estrategia: {plan.get('accion')}
+                    Tipo: {plan.get('tipo')}
+                    Dimensión: {dimension}
+                    
+                    Proporciona:
+                    1. OBJETIVO: ¿Qué busca lograr esta estrategia?
+                    2. BENEFICIOS: ¿Qué beneficios trae a la organización y trabajadores?
+                    3. CONSIDERACIONES: ¿Qué aspectos importantes deben considerarse para su implementación?
+                    
+                    Sé breve y concreto.
+                    """
+                    respuesta = consultar_gemini(prompt)
+                
+                partes = respuesta.split("\n\n")
+                for parte in partes:
+                    if parte.strip().upper().startswith("OBJETIVO"):
+                        contenido = parte.replace("OBJETIVO:", "").strip()
+                        st.markdown(crear_html_seccion("OBJETIVO", contenido), unsafe_allow_html=True)
+                    elif parte.strip().upper().startswith("BENEFICIO"):
+                        contenido = parte.replace("BENEFICIOS:", "").replace("BENEFICIO:", "").strip()
+                        st.markdown(crear_html_seccion("BENEFICIOS", contenido), unsafe_allow_html=True)
+                    elif parte.strip().upper().startswith("CONSIDERAC"):
+                        contenido = parte.replace("CONSIDERACIONES:", "").strip()
+                        st.markdown(crear_html_seccion("CONSIDERACIONES", contenido), unsafe_allow_html=True)
+            
+            st.write("")
     else:
         st.info("No se requieren acciones críticas según los parámetros actuales.")
     
@@ -367,8 +458,229 @@ if archivo is not None:
                     with col_dominio:
                         dominio_sel = st.selectbox("📂 Dominio a Validar:", list(DOMINIOS_MAP.keys()))
 
-                    st.markdown("---")
-                    st.subheader(f"📊 Detalle: {dominio_sel}")
+                    # --- TOP 3 ÁREAS CON MAYOR RIESGO (GLOBAL) - Solo se calcula una vez ---
+                    cache_key = "riesgos_areas_cache"
+                    if cache_key not in st.session_state:
+                        @st.cache_data(ttl=3600)
+                        def calcular_riesgos_todas_areas(lista_areas, df_informe):
+                            riesgos = []
+                            
+                            # Dimensiones para calcular riesgo intralaboral
+                            dims_intra = ["Caracteristicas Liderazgo", "Relaciones Sociales", "Retroal. Desempeño", "Relación colaboradores", 
+                                "Claridad de Rol", "Capacitación", "Participación y manejo del cambio", "Oportunidades para el desarrollo", 
+                                "e Control y autonomia sobre el trabajo", "Demandas cuantitativas", "Demandas emocionales", 
+                                "Demandas de carga mental", "Demandas ambientales y de esfuerzo fisico", "Demandas de jornada laboral",
+                                "Exigencias de responsabilidad", "Consistencia de rol", "Influencia sobre el entorno extra"]
+                            dims_extra = ["Recompensas de pertenencia y trabajo", "Reconocimiento y compensación"]
+                            
+                            for area in lista_areas:
+                                # Calcular riesgo INTRALABORAL
+                                riesgo_intra = 0
+                                count_intra = 0
+                                for dim in dims_intra:
+                                    try:
+                                        df_dim = extraer_tabla_por_titulo(df_informe, dim, area)
+                                        if not df_dim.empty and "Valor" in df_dim.columns:
+                                            val_alto = df_dim[df_dim["Nivel"] == "Riesgo alto"]["Valor"].sum()
+                                            val_muy_alto = df_dim[df_dim["Nivel"] == "Riesgo muy alto"]["Valor"].sum()
+                                            riesgo_intra += val_alto + val_muy_alto
+                                            count_intra += 1
+                                    except:
+                                        continue
+                                prom_intra = riesgo_intra / count_intra if count_intra > 0 else 0
+                                
+                                # Calcular riesgo EXTRALABORAL
+                                riesgo_extra = 0
+                                count_extra = 0
+                                for dim in dims_extra:
+                                    try:
+                                        df_dim = extraer_tabla_por_titulo(df_informe, dim, area)
+                                        if not df_dim.empty and "Valor" in df_dim.columns:
+                                            val_alto = df_dim[df_dim["Nivel"] == "Riesgo alto"]["Valor"].sum()
+                                            val_muy_alto = df_dim[df_dim["Nivel"] == "Riesgo muy alto"]["Valor"].sum()
+                                            riesgo_extra += val_alto + val_muy_alto
+                                            count_extra += 1
+                                    except:
+                                        continue
+                                prom_extra = riesgo_extra / count_extra if count_extra > 0 else 0
+                                
+                                # Calcular riesgo ESTRÉS (todas las dimensiones)
+                                riesgo_estres = 0
+                                count_estres = 0
+                                for dim in dims_intra + dims_extra:
+                                    try:
+                                        df_dim = extraer_tabla_por_titulo(df_informe, dim, area)
+                                        if not df_dim.empty and "Valor" in df_dim.columns:
+                                            val_alto = df_dim[df_dim["Nivel"] == "Riesgo alto"]["Valor"].sum()
+                                            val_muy_alto = df_dim[df_dim["Nivel"] == "Riesgo muy alto"]["Valor"].sum()
+                                            riesgo_estres += val_alto + val_muy_alto
+                                            count_estres += 1
+                                    except:
+                                        continue
+                                prom_estres = riesgo_estres / count_estres if count_estres > 0 else 0
+                                
+                                # Promedio de las 3 encuestas
+                                riesgo_promedio = (prom_intra + prom_extra + prom_estres) / 3
+                                
+                                # Clasificación según nuevos rangos
+                                if riesgo_promedio >= 85:
+                                    nivel = "Riesgo Muy Alto"
+                                    color = "#D33A34"
+                                elif riesgo_promedio >= 70:
+                                    nivel = "Riesgo Alto"
+                                    color = "#FF8A00"
+                                elif riesgo_promedio >= 50:
+                                    nivel = "Riesgo Medio"
+                                    color = "#FFDC4F"
+                                elif riesgo_promedio >= 30:
+                                    nivel = "Riesgo Bajo"
+                                    color = "#96FFE3"
+                                else:
+                                    nivel = "Sin Riesgo"
+                                    color = "#4CAF50"
+                                
+                                riesgos.append((area, riesgo_promedio, nivel, color))
+                            
+                            return sorted(riesgos, key=lambda x: x[1], reverse=True)
+
+                        st.session_state[cache_key] = calcular_riesgos_todas_areas(lista_areas, df_informe)
+                    
+                    riesgos_todas = st.session_state[cache_key]
+                    
+                    if riesgos_todas and riesgos_todas[0][1] > 0:
+                        st.markdown('<p style="text-align: center; font-size: 16px; font-weight: 600; margin-bottom: 10px;">Áreas con Mayor Riesgo</p>', unsafe_allow_html=True)
+                        cols_areas = st.columns(3)
+                        for i in range(min(3, len(riesgos_todas))):
+                            area, riesgo, nivel, color = riesgos_todas[i]
+                            with cols_areas[i]:
+                                if "Muy Alto" in nivel:
+                                    gradiente = "linear-gradient(135deg, #8B0000 0%, #5c0000 100%)"
+                                    borde = "#ff4444"
+                                elif "Alto" in nivel:
+                                    gradiente = "linear-gradient(135deg, #D33A34 0%, #8B0000 100%)"
+                                    borde = "#ff6b6b"
+                                elif "Medio" in nivel:
+                                    gradiente = "linear-gradient(135deg, #FF8A00 0%, #CC7000 100%)"
+                                    borde = "#ffc048"
+                                elif "Bajo" in nivel:
+                                    gradiente = "linear-gradient(135deg, #2d2d44 0%, #1e1e2e 100%)"
+                                    borde = "#2ecc71"
+                                else:
+                                    gradiente = "linear-gradient(135deg, #1e3a2f 0%, #162d25 100%)"
+                                    borde = "#27ae60"
+                                
+                                st.markdown(f"""<div style="background: {gradiente}; border-radius: 15px; padding: 18px; border: 2px solid {borde}; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.4);">
+                                    <div style="font-size: 28px; font-weight: bold; color: white;">{int(riesgo)}%</div>
+                                    <div style="font-size: 13px; color: white; font-weight: 600;">{area}</div>
+                                    <div style="font-size: 11px; color: {borde};">{nivel}</div>
+                                </div>""", unsafe_allow_html=True)
+                        st.write("")
+
+                    # --- TOP 3 DIMENSIONES CON MAYOR RIESGO (GENERAL) - Cache por área ---
+                    cache_key_dimensiones = f"riesgos_dimensiones_{area_sel}"
+                    if cache_key_dimensiones not in st.session_state:
+                        todos_riesgos = []
+                        for dominio in DOMINIOS_MAP.keys():
+                            for nombre_dimension in DOMINIOS_MAP[dominio]:
+                                df_dim = extraer_tabla_por_titulo(df_informe, nombre_dimension, area_sel)
+                                if not df_dim.empty and "Valor" in df_dim.columns:
+                                    val_alto = df_dim[df_dim["Nivel"] == "Riesgo alto"]["Valor"].sum()
+                                    val_muy_alto = df_dim[df_dim["Nivel"] == "Riesgo muy alto"]["Valor"].sum()
+                                    riesgo_critico = val_alto + val_muy_alto
+                                    todos_riesgos.append((nombre_dimension, riesgo_critico, dominio))
+                        
+                        todos_riesgos.sort(key=lambda x: x[1], reverse=True)
+                        st.session_state[cache_key_dimensiones] = todos_riesgos
+                    
+                    todos_riesgos = st.session_state[cache_key_dimensiones]
+                    
+                    if todos_riesgos and todos_riesgos[0][1] > 0:
+                        st.markdown('<p style="text-align: center; font-size: 16px; font-weight: 600; margin-bottom: 10px;">Dimensiones con Mayor Riesgo General</p>', unsafe_allow_html=True)
+                        cols_top = st.columns(3)
+                        for i in range(min(3, len(todos_riesgos))):
+                            dim, riesgo, dom = todos_riesgos[i]
+                            with cols_top[i]:
+                                if riesgo >= 85:
+                                    gradiente = "linear-gradient(135deg, #8B0000 0%, #5c0000 100%)"
+                                    borde = "#ff4444"
+                                    nivel_texto = "Riesgo Muy Alto"
+                                    color_letra = "white"
+                                    color_sub = "#ddd"
+                                elif riesgo >= 70:
+                                    gradiente = "linear-gradient(135deg, #2d2d44 0%, #1e1e2e 100%)"
+                                    borde = "#ff4444"
+                                    nivel_texto = "Riesgo Alto"
+                                    color_letra = borde
+                                    color_sub = borde
+                                elif riesgo >= 50:
+                                    gradiente = "linear-gradient(135deg, #2d2d44 0%, #1e1e2e 100%)"
+                                    borde = "#e67e22"
+                                    nivel_texto = "Riesgo Medio"
+                                    color_letra = borde
+                                    color_sub = borde
+                                elif riesgo >= 30:
+                                    gradiente = "linear-gradient(135deg, #2d2d44 0%, #1e1e2e 100%)"
+                                    borde = "#2ecc71"
+                                    nivel_texto = "Riesgo Bajo"
+                                    color_letra = borde
+                                    color_sub = borde
+                                else:
+                                    gradiente = "linear-gradient(135deg, #2d2d44 0%, #1e1e2e 100%)"
+                                    borde = "#27ae60"
+                                    nivel_texto = "Sin Riesgo"
+                                    color_letra = borde
+                                    color_sub = borde
+                                
+                                st.markdown(f"""<div style="background: {gradiente}; border-radius: 15px; padding: 18px; border: 2px solid {borde}; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.4);">
+                                    <div style="font-size: 12px; color: {color_sub}; text-transform: uppercase; margin-bottom: 5px;">{dim}</div>
+                                    <div style="font-size: 32px; font-weight: bold; color: {color_letra};">{int(riesgo)}%</div>
+                                    <div style="font-size: 11px; color: {color_sub}; margin-top: 5px;">{nivel_texto} | {dom}</div>
+                                </div>""", unsafe_allow_html=True)
+
+                    st.write("")
+                    
+                    # --- TOP 4 DIMENSIONES CON MAYOR RIESGO (DEL DOMINIO) - Cache por área y dominio ---
+                    dimensiones_a_procesar = DOMINIOS_MAP[dominio_sel]
+                    
+                    cache_key_domain = f"riesgos_dominio_{area_sel}_{dominio_sel}"
+                    if cache_key_domain not in st.session_state:
+                        riesgos_dim = []
+                        for nombre_dimension in dimensiones_a_procesar:
+                            df_dim = extraer_tabla_por_titulo(df_informe, nombre_dimension, area_sel)
+                            if not df_dim.empty and "Valor" in df_dim.columns:
+                                val_alto = df_dim[df_dim["Nivel"] == "Riesgo alto"]["Valor"].sum()
+                                val_muy_alto = df_dim[df_dim["Nivel"] == "Riesgo muy alto"]["Valor"].sum()
+                                riesgo_critico = val_alto + val_muy_alto
+                                riesgos_dim.append((nombre_dimension, riesgo_critico))
+                        
+                        riesgos_dim.sort(key=lambda x: x[1], reverse=True)
+                        st.session_state[cache_key_domain] = riesgos_dim
+                    
+                    riesgos_dim = st.session_state[cache_key_domain]
+                    
+                    if riesgos_dim and riesgos_dim[0][1] > 0:
+                        st.markdown('<p style="text-align: center; font-size: 16px; font-weight: 600; margin-bottom: 10px;">Dimensiones con Mayor Riesgo en este Dominio</p>', unsafe_allow_html=True)
+                        cols_criticas = st.columns(min(4, len(riesgos_dim)))
+                        for i, (dim, riesgo) in enumerate(riesgos_dim[:4]):
+                            if riesgo > 0:
+                                with cols_criticas[i % min(4, len(riesgos_dim))]:
+                                    if riesgo >= 85:
+                                        color = "#D33A34"
+                                    elif riesgo >= 70:
+                                        color = "#FF8A00"
+                                    elif riesgo >= 50:
+                                        color = "#FFDC4F"
+                                    elif riesgo >= 30:
+                                        color = "#27ae60"
+                                    else:
+                                        color = "#66CDAA"
+                                    st.markdown(f"""<div style="background: linear-gradient(135deg, #1e1e2e 0%, #2d2d44 100%); border-radius: 10px; padding: 12px; border-left: 4px solid {color}; margin-bottom: 10px;">
+                                        <div style="font-size: 11px; color: #888; text-transform: uppercase;">{dim.upper()}</div>
+                                        <div style="font-size: 24px; font-weight: bold; color: {color};">{int(riesgo)}%</div>
+                                        <div style="font-size: 10px; color: #666;">Riesgo crítico</div>
+                                    </div>""", unsafe_allow_html=True)
+                        
+                        st.divider()
 
                     # --- BUCLE DINÁMICO DE DIMENSIONES ---
                     # Esto reemplaza los bloques 'especialistas' manuales
@@ -402,7 +714,7 @@ if archivo is not None:
                                     clase_tarjeta, emoji, label_texto, nivel_key = "bg-alto", "⚠️", "RIESGO ALTO", "Alto"
                                 elif riesgo_total_critico >= 50.0:
                                     clase_tarjeta, emoji, label_texto, nivel_key = "bg-medio", "🔸", "RIESGO MEDIO", "Medio"
-                                elif riesgo_total_critico >= 10.0:
+                                elif riesgo_total_critico >= 30.0:
                                     clase_tarjeta, emoji, label_texto, nivel_key = "bg-bajo", "🔹", "RIESGO BAJO", "Bajo"
 
                                 # 5. GENERAR GRÁFICA (La creamos antes de mostrarla)

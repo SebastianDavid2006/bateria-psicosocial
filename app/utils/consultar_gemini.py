@@ -1,17 +1,35 @@
 ﻿import os
 import time
-import requests
 from typing import Any, Dict, List, Optional
 
+import google.generativeai as genai
+
 DEFAULT_GEMINI_MODELS: List[str] = [
-    "gemini-3.1-pro",
-    "gemini-2.5-pro",
-    "gemini-1.5-pro",
-    "gemini-3.1",
-    "gemini-2.5",
-    "gemini-1.5",
-    "gemini-1.0",
+    "models/gemini-3.1-pro",
+    "models/gemini-2.5-pro",
+    "models/gemini-1.5-pro",
+    "models/gemini-1.5-flash",
+    "models/gemini-1.5-flash-002",
+    "models/gemini-3.1",
+    "models/gemini-2.5",
+    "models/gemini-1.5",
+    "models/text-bison-002",
+    "models/text-bison-001",
 ]
+
+
+def _list_available_models() -> List[str]:
+    try:
+        models = genai.list_models()
+        result: List[str] = []
+        for model in models:
+            if hasattr(model, "name"):
+                result.append(model.name)
+            elif isinstance(model, str):
+                result.append(model)
+        return result
+    except Exception:
+        return []
 
 
 def _build_system_prompt(config: Dict[str, Any]) -> str:
@@ -27,50 +45,76 @@ def _build_system_prompt(config: Dict[str, Any]) -> str:
     )
 
 
-def _get_model_list() -> List[str]:
+def _normalize_model_name(modelo: str) -> str:
+    return modelo if modelo.startswith("models/") else f"models/{modelo}"
+
+
+def _get_model_list(available_models: Optional[List[str]] = None) -> List[str]:
     env_model = os.getenv("GENAI_MODEL")
-    if env_model:
-        return [env_model] + [m for m in DEFAULT_GEMINI_MODELS if m != env_model]
+    normalized = _normalize_model_name(env_model) if env_model else None
+
+    if available_models:
+        modelos = []
+        if normalized:
+            modelos.append(normalized)
+        for model in available_models:
+            if model not in modelos:
+                modelos.append(model)
+        return modelos
+
+    if normalized:
+        return [normalized] + [m for m in DEFAULT_GEMINI_MODELS if m != normalized]
     return DEFAULT_GEMINI_MODELS
 
 
-def _build_payload(prompt_usuario: str, config: Dict[str, Any], max_tokens: int, method: str) -> Dict[str, Any]:
-    prompt_text = _build_system_prompt(config) + prompt_usuario
-
-    if method == "generateContent":
-        return {
-            "contents": [
-                {
-                    "parts": [
-                        {"text": prompt_text}
-                    ]
-                }
-            ],
-            "generationConfig": {
-                "temperature": 0.5,
-                "topP": 0.95,
-                "topK": 20,
-                "maxOutputTokens": max_tokens,
-            },
-        }
-
-    return {
-        "prompt": {"text": prompt_text},
-        "temperature": 0.5,
-        "topP": 0.95,
-        "topK": 20,
-        "maxOutputTokens": max_tokens,
-    }
+def _configure_genai(api_key: str) -> None:
+    genai.configure(api_key=api_key, transport="rest")
 
 
-def _call_gemini(modelo: str, api_key: str, payload: Dict[str, Any], method: str) -> requests.Response:
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:{method}?key={api_key}"
-    return requests.post(
-        url,
-        json=payload,
-        headers={"Content-Type": "application/json"},
-        timeout=30,
+def _build_prompt(prompt_usuario: str, config: Dict[str, Any]) -> str:
+    return _build_system_prompt(config) + prompt_usuario.strip()
+
+
+def _parse_response(response: Any) -> Optional[str]:
+    if hasattr(response, "text") and isinstance(response.text, str) and response.text.strip():
+        return response.text.strip()
+
+    if hasattr(response, "candidates") and response.candidates:
+        primera = response.candidates[0]
+        content = getattr(primera, "content", None)
+        if isinstance(content, dict):
+            parts = content.get("parts", [])
+            if parts and isinstance(parts, list):
+                texto = parts[0].get("text", "")
+                if texto:
+                    return texto.strip()
+        if hasattr(content, "text") and isinstance(content.text, str) and content.text.strip():
+            return content.text.strip()
+
+        output = getattr(primera, "output", None)
+        if isinstance(output, str) and output.strip():
+            return output.strip()
+        if isinstance(output, dict):
+            texto = output.get("text", "")
+            if texto:
+                return texto.strip()
+
+    return None
+
+
+def _try_model(modelo: str, prompt: str, max_tokens: int) -> str:
+    model = genai.GenerativeModel(model_name=modelo)
+    generation_config = genai.GenerationConfig(
+        temperature=0.5,
+        top_p=0.95,
+        top_k=20,
+        max_output_tokens=max_tokens,
     )
+    response = model.generate_content(prompt, generation_config=generation_config)
+    parsed = _parse_response(response)
+    if parsed:
+        return parsed
+    raise RuntimeError("Respuesta de Gemini sin texto válido.")
 
 
 def consultar_gemini(prompt_usuario: str, config_personalizada: Optional[Dict[str, Any]] = None, max_tokens: int = 10000) -> str:
@@ -87,56 +131,28 @@ def consultar_gemini(prompt_usuario: str, config_personalizada: Optional[Dict[st
     if not api_key:
         return "❌ Error: variable de entorno GOOGLE_API_KEY no configurada."
 
-    modelos = _get_model_list()
-    metodos = ["generateContent", "generateText"]
-    ultimo_error = "❌ Error: No se pudo conectar con ningún modelo de Gemini."
+    _configure_genai(api_key)
+    prompt = _build_prompt(prompt_usuario, config)
+
+    available_models = _list_available_models()
+    modelos = _get_model_list(available_models)
+    errores: List[str] = []
+
+    if available_models:
+        errores.append(f"Modelos disponibles detectados: {', '.join(available_models[:8])}...")
 
     for modelo in modelos:
-        for metodo in metodos:
-            try:
-                payload = _build_payload(prompt_usuario, config, max_tokens, metodo)
-                response = _call_gemini(modelo, api_key, payload, metodo)
+        try:
+            return _try_model(modelo, prompt, max_tokens)
+        except Exception as e:
+            mensaje = str(e).strip()
+            if "401" in mensaje or "403" in mensaje:
+                return "❌ Error de autenticación: verifica tu API key de Google AI."
+            errores.append(f"{modelo} -> {mensaje}")
+            time.sleep(1)
 
-                if response.status_code == 200:
-                    data = response.json()
-                    candidatos = data.get("candidates", [])
-                    if candidatos and isinstance(candidatos, list):
-                        primera = candidatos[0]
-                        content = primera.get("content", {})
-                        if isinstance(content, dict):
-                            parts = content.get("parts", [])
-                            if parts and isinstance(parts, list):
-                                texto = parts[0].get("text", "")
-                                if texto:
-                                    return texto.strip()
-                        output = primera.get("output")
-                        if isinstance(output, str) and output.strip():
-                            return output.strip()
-                        if isinstance(output, dict):
-                            texto = output.get("text", "")
-                            if texto:
-                                return texto.strip()
-                    ultimo_error = "❌ Error: respuesta de Gemini malformada."
-                    continue
-
-                if response.status_code == 404:
-                    ultimo_error = f"❌ Modelo {modelo} no disponible para {metodo}."
-                    continue
-                if response.status_code == 403:
-                    return "❌ Error de autenticación: verifica tu API key de Google AI."
-                if response.status_code == 429:
-                    time.sleep(2)
-                    continue
-
-                ultimo_error = f"❌ Error API {response.status_code}: {response.text}"
-            except requests.exceptions.Timeout:
-                ultimo_error = "❌ Timeout al consultar la API de Gemini."
-                continue
-            except requests.exceptions.RequestException as e:
-                ultimo_error = f"❌ Error de red al consultar Gemini: {e}"
-                continue
-            except Exception as e:
-                ultimo_error = f"❌ Error inesperado: {e}"
-                continue
-
-    return ultimo_error
+    detalles = "\n".join(errores[-8:])
+    return (
+        "❌ No se pudo conectar con ningún modelo de Gemini. Revisa tu API key, el modelo y el acceso de tu cuenta.\n"
+        f"Intentos recientes:\n{detalles}"
+    )
