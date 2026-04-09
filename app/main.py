@@ -465,62 +465,28 @@ if archivo is not None:
                         def calcular_riesgos_todas_areas(lista_areas, df_informe):
                             riesgos = []
                             
-                            # Dimensiones para calcular riesgo intralaboral
+                            # Solo dimensiones de Intralaboral
                             dims_intra = ["Caracteristicas Liderazgo", "Relaciones Sociales", "Retroal. Desempeño", "Relación colaboradores", 
                                 "Claridad de Rol", "Capacitación", "Participación y manejo del cambio", "Oportunidades para el desarrollo", 
                                 "e Control y autonomia sobre el trabajo", "Demandas cuantitativas", "Demandas emocionales", 
                                 "Demandas de carga mental", "Demandas ambientales y de esfuerzo fisico", "Demandas de jornada laboral",
                                 "Exigencias de responsabilidad", "Consistencia de rol", "Influencia sobre el entorno extra"]
-                            dims_extra = ["Recompensas de pertenencia y trabajo", "Reconocimiento y compensación"]
                             
                             for area in lista_areas:
-                                # Calcular riesgo INTRALABORAL
-                                riesgo_intra = 0
-                                count_intra = 0
+                                riesgo_total = 0
+                                count_dims = 0
                                 for dim in dims_intra:
                                     try:
                                         df_dim = extraer_tabla_por_titulo(df_informe, dim, area)
                                         if not df_dim.empty and "Valor" in df_dim.columns:
                                             val_alto = df_dim[df_dim["Nivel"] == "Riesgo alto"]["Valor"].sum()
                                             val_muy_alto = df_dim[df_dim["Nivel"] == "Riesgo muy alto"]["Valor"].sum()
-                                            riesgo_intra += val_alto + val_muy_alto
-                                            count_intra += 1
+                                            riesgo_total += val_alto + val_muy_alto
+                                            count_dims += 1
                                     except:
                                         continue
-                                prom_intra = riesgo_intra / count_intra if count_intra > 0 else 0
                                 
-                                # Calcular riesgo EXTRALABORAL
-                                riesgo_extra = 0
-                                count_extra = 0
-                                for dim in dims_extra:
-                                    try:
-                                        df_dim = extraer_tabla_por_titulo(df_informe, dim, area)
-                                        if not df_dim.empty and "Valor" in df_dim.columns:
-                                            val_alto = df_dim[df_dim["Nivel"] == "Riesgo alto"]["Valor"].sum()
-                                            val_muy_alto = df_dim[df_dim["Nivel"] == "Riesgo muy alto"]["Valor"].sum()
-                                            riesgo_extra += val_alto + val_muy_alto
-                                            count_extra += 1
-                                    except:
-                                        continue
-                                prom_extra = riesgo_extra / count_extra if count_extra > 0 else 0
-                                
-                                # Calcular riesgo ESTRÉS (todas las dimensiones)
-                                riesgo_estres = 0
-                                count_estres = 0
-                                for dim in dims_intra + dims_extra:
-                                    try:
-                                        df_dim = extraer_tabla_por_titulo(df_informe, dim, area)
-                                        if not df_dim.empty and "Valor" in df_dim.columns:
-                                            val_alto = df_dim[df_dim["Nivel"] == "Riesgo alto"]["Valor"].sum()
-                                            val_muy_alto = df_dim[df_dim["Nivel"] == "Riesgo muy alto"]["Valor"].sum()
-                                            riesgo_estres += val_alto + val_muy_alto
-                                            count_estres += 1
-                                    except:
-                                        continue
-                                prom_estres = riesgo_estres / count_estres if count_estres > 0 else 0
-                                
-                                # Promedio de las 3 encuestas
-                                riesgo_promedio = (prom_intra + prom_extra + prom_estres) / 3
+                                riesgo_promedio = riesgo_total / count_dims if count_dims > 0 else 0
                                 
                                 # Clasificación según nuevos rangos
                                 if riesgo_promedio >= 85:
@@ -554,25 +520,25 @@ if archivo is not None:
                             area, riesgo, nivel, color = riesgos_todas[i]
                             with cols_areas[i]:
                                 if "Muy Alto" in nivel:
-                                    gradiente = "linear-gradient(135deg, #8B0000 0%, #5c0000 100%)"
-                                    borde = "#ff4444"
+                                    gradiente = "linear-gradient(145deg, #c0392b 0%, #8e2a1f 50%, #5c1914 100%)"
+                                    borde = "#e74c3c"
                                 elif "Alto" in nivel:
-                                    gradiente = "linear-gradient(135deg, #D33A34 0%, #8B0000 100%)"
-                                    borde = "#ff6b6b"
+                                    gradiente = "linear-gradient(145deg, #d35400 0%, #a04000 50%, #6e2c00 100%)"
+                                    borde = "#e67e22"
                                 elif "Medio" in nivel:
-                                    gradiente = "linear-gradient(135deg, #FF8A00 0%, #CC7000 100%)"
-                                    borde = "#ffc048"
+                                    gradiente = "linear-gradient(145deg, #f39c12 0%, #d68910 50%, #b9770e 100%)"
+                                    borde = "#f1c40f"
                                 elif "Bajo" in nivel:
-                                    gradiente = "linear-gradient(135deg, #2d2d44 0%, #1e1e2e 100%)"
+                                    gradiente = "linear-gradient(145deg, #27ae60 0%, #1e8449 50%, #145a32 100%)"
                                     borde = "#2ecc71"
                                 else:
-                                    gradiente = "linear-gradient(135deg, #1e3a2f 0%, #162d25 100%)"
-                                    borde = "#27ae60"
+                                    gradiente = "linear-gradient(145deg, #1abc9c 0%, #16a085 50%, #117a65 100%)"
+                                    borde = "#1abc9c"
                                 
-                                st.markdown(f"""<div style="background: {gradiente}; border-radius: 15px; padding: 18px; border: 2px solid {borde}; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.4);">
-                                    <div style="font-size: 28px; font-weight: bold; color: white;">{int(riesgo)}%</div>
-                                    <div style="font-size: 13px; color: white; font-weight: 600;">{area}</div>
-                                    <div style="font-size: 11px; color: {borde};">{nivel}</div>
+                                st.markdown(f"""<div style="background: {gradiente}; border-radius: 15px; padding: 20px; border: 2px solid {borde}; text-align: center; box-shadow: 0 8px 25px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1);">
+                                    <div style="font-size: 26px; font-weight: bold; color: white; text-shadow: 0 2px 4px rgba(0,0,0,0.3);">{int(riesgo)}%</div>
+                                    <div style="font-size: 14px; color: white; font-weight: 600; margin-top: 8px;">{area}</div>
+                                    <div style="font-size: 11px; color: rgba(255,255,255,0.85); margin-top: 5px; font-weight: 500;">{nivel}</div>
                                 </div>""", unsafe_allow_html=True)
                         st.write("")
 
